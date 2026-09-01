@@ -15,7 +15,7 @@ export function Goals() {
 
       <div className="mx-auto max-w-5xl">
         <SectionHeading
-          index="09 // MISSIONS"
+          index="10 // MISSIONS"
           title="FUTURE MISSIONS"
           subtitle="Calibrated objectives for the next orbital cycles."
           accent="plasma"

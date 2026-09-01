@@ -64,7 +64,7 @@ export function Contact() {
 
       <div className="mx-auto max-w-5xl">
         <SectionHeading
-          index="10 // SIGNAL"
+          index="11 // SIGNAL"
           title="OPEN A CHANNEL"
           subtitle="Transmit a message across the void — I monitor all incoming frequencies."
           accent="cyan"

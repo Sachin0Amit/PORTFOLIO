@@ -11,6 +11,7 @@ const LINKS = [
   { label: "CREDS", href: "#certificates" },
   { label: "TELEMETRY", href: "#performance" },
   { label: "ARSENAL", href: "#skills" },
+  { label: "UPLINK", href: "#platforms" },
   { label: "ARCHIVE", href: "#projects" },
   { label: "MISSIONS", href: "#goals" },
   { label: "SIGNAL", href: "#contact" },

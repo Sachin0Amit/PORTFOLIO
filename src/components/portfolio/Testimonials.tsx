@@ -68,7 +68,7 @@ export function Testimonials() {
 
       <div className="mx-auto max-w-5xl">
         <SectionHeading
-          index="08 // TRANSMISSIONS"
+          index="09 // TRANSMISSIONS"
           title="INCOMING SIGNALS"
           subtitle="Decoded transmissions from collaborators, mentors and peers across the network."
           accent="plasma"

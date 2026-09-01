@@ -62,3 +62,16 @@ model Testimonial {
   @@index([createdAt])
   @@index([approved])
 }
+
+/// Coding-platform uplinks (leetcode / codeforces / github). The owner
+/// connects a profile by POSTing a handle — live stats are then fetched
+/// from each platform's public API and cached in memory.
+model PlatformConfig {
+  id          String   @id @default(cuid())
+  platform    String   @unique
+  handle      String?
+  profileUrl  String?
+  enabled     Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  updatedAt   DateTime @updatedAt
+}

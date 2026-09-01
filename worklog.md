@@ -153,3 +153,42 @@ Unresolved issues / next-phase priorities:
 - Same as Task 6: social links "#", QA testimonial data, untested Konami/sound toggle
 - Semester tracker shows SEM 02 as "LIVE" — consistent with site's "Semester 1 recorded / currently enrolled" story, but if user is actually in a later semester the tracker mapping should be updated
 - recharts now only used by unused ui/chart.tsx — could be dropped from deps if desired
+
+---
+Task ID: 8
+Agent: main (Z.ai Code) — direct user request
+Task: User wants live LeetCode / GitHub / Codeforces progress on the site, connectable via backend; profile links will be sent later (no auth tokens required unless desired)
+
+Work Log:
+- Added Prisma model PlatformConfig (platform unique, handle?, profileUrl?, enabled, sortOrder) + db:push; restarted dev server for fresh Prisma client
+- Built src/lib/platform-types.ts (shared client/server types: PlatformResponse with status live|standby|degraded|disabled)
+- Built src/lib/platform-stats.ts (server fetchers):
+  - LeetCode: public GraphQL (matchedUser → ranking, userAvatar, submitStatsGlobal acSubmissionNum counts; userContestRanking → contest rating)
+  - Codeforces: official REST user.info (rating, maxRating, rank, maxRank, contribution, avatar)
+  - GitHub: REST /users/{h} + /users/{h}/repos (sum stars excl. forks, top-3 languages by repo count, followers, member since); optional GITHUB_TOKEN env lifts rate limits
+  - In-memory cache: 10 min success / 2 min failure TTL; 8s AbortController timeout; rate-limit (403/429) → "UPSTREAM RATE LIMITED"
+- Built /api/platforms route: GET (per-platform stats or standby when no handle; profileUrl auto-synthesized from handle), POST (connect/update handle+profileUrl, zod-like manual validation, optional UPLINK_ADMIN_KEY header guard when env set), DELETE (?platform= disconnect); cache cleared on writes
+- Built Platforms.tsx section (id="platforms", heading "07 // UPLINK / CODING UPLINK", accent cyan):
+  - 3 mini-console cards matching the redesigned Performance telemetry aesthetic (scanlines, header strip w/ platform icon + CH·01-03 + status badge, footer w/ avatar + @handle + VIEW PROFILE external link)
+  - LeetCode card: animated SVG ring (total solved / ~3600) + EASY(alien)/MEDIUM(amber)/HARD(plasma) bars + GLOBAL RANK + CONTEST rating
+  - Codeforces card: big tier-colored rating, rank badge (blue-free tier map: legendary→plasma, master→amber, expert/specialist→cyan), current-vs-peak bar, contribution
+  - GitHub card: 2x2 stats grid (REPOS/STARS/FOLLOWERS/FOLLOWING) + TOP LANGUAGES chips + member-since
+  - States: loading skeleton, STANDBY ("AWAITING UPLINK" pulsing satellite dish, dashed ring), DEGRADED ("SIGNAL LOST" + error code + AUTO-RETRY), LIVE (pinging badge)
+  - Sync strip: UPLINKS n/3 ACTIVE · LAST SYNC hh:mm:ss · AUTO 10M + RESYNC button (spins while refreshing); polls every 10 min
+- Registered section: page.tsx (after Skills), Navbar (UPLINK), SectionRail (UPLINK), CommandPalette (Uplink/Satellite icon), Footer nav; renumbered later sections (Projects 08, Testimonials 09, Goals 10, Contact 11)
+- Fixed 3 type errors (Map entries typing on findMany fallback, CacheEntry.value access, removed unused eslint-disable)
+- QA: tsc clean (app), eslint clean, 0 console/page errors
+- Backend verified end-to-end with public test profiles: leetcode=neal_wu (253 solved, 60/141/52 E/M/H, rank #627341, contest 3686), codeforces=tourist (3528/4009 legendary GM, +109), github=octocat (8 repos, 20821 stars, 23887 followers, HTML/CSS) — then all DISCONNECTED and reset to standby
+- Browser QA: standby (3x AWAITING UPLINK) → connect → RESYNC click → live cards render (VLM verified ring+bars, rating+badge, degraded state on rate-limited GitHub) → DELETE → RESYNC → back to 3x standby; nav UPLINK scrolls to top:0; mobile 390px no overflow, cards stack, ring+bars side-by-side fit
+- Final state: all three platforms in STANDBY awaiting the user's real handles
+
+Stage Summary:
+- Full live-stats pipeline shipped: DB-configurable handles → server fetchers (no auth needed for LeetCode/Codeforces; GitHub works unauthenticated but shared-IP rate limits can degrade it — GITHUB_TOKEN env optional) → cached /api/platforms GET → console-style UI with live/standby/degraded states + manual RESYNC + 10-min auto-poll
+- To connect when the user sends profile links: POST /api/platforms {"platform":"leetcode","handle":"<user>"} (same for codeforces/github) — or tell me the links and I will set them
+- No user data is fabricated: cards stay in honest STANDBY state until real handles are linked
+
+Unresolved issues / next-phase priorities:
+- Awaiting user's real LeetCode/Codeforces/GitHub profile links (send handles or full URLs — I will POST them)
+- GitHub unauthenticated rate limit (60/hr shared IP): if the deployed card flips to SIGNAL LOST occasionally, ask user for a Personal Access Token (public read-only scope) and set GITHUB_TOKEN env
+- Social links in Footer/About still "#" placeholders — will be filled when user sends real profiles
+- Could later add: GitHub contribution heatmap (needs token+GraphQL), LeetCode recent-contest history, streak stats

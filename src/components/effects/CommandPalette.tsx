@@ -14,6 +14,7 @@ import {
   Target,
   Send,
   Sparkles,
+  Satellite,
   X,
 } from "lucide-react";
 
@@ -34,6 +35,7 @@ const SECTIONS = [
   { id: "performance", label: "Telemetry", icon: Gauge, hint: "SGPA & metrics" },
   { id: "achievements", label: "Insignia", icon: Sparkles, hint: "Achievement badges" },
   { id: "skills", label: "Arsenal", icon: Layers, hint: "Tech stack" },
+  { id: "platforms", label: "Uplink", icon: Satellite, hint: "Live coding stats" },
   { id: "projects", label: "Archive", icon: ArrowUpRight, hint: "Project builds" },
   { id: "testimonials", label: "Signals", icon: Sparkles, hint: "Peer testimonials" },
   { id: "goals", label: "Missions", icon: Target, hint: "Future goals" },

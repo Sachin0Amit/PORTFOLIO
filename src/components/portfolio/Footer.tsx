@@ -47,6 +47,7 @@ export function Footer() {
                 { label: "Trajectory", href: "#education" },
                 { label: "Telemetry", href: "#performance" },
                 { label: "Arsenal", href: "#skills" },
+                { label: "Uplink", href: "#platforms" },
               ].map((l) => (
                 <li key={l.href}>
                   <a

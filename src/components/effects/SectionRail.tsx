@@ -16,6 +16,7 @@ const SECTIONS: SectionMeta[] = [
   { id: "performance", label: "TELEMETRY" },
   { id: "achievements", label: "INSIGNIA" },
   { id: "skills", label: "ARSENAL" },
+  { id: "platforms", label: "UPLINK" },
   { id: "projects", label: "ARCHIVE" },
   { id: "testimonials", label: "SIGNALS" },
   { id: "goals", label: "MISSIONS" },

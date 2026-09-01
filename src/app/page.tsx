@@ -18,6 +18,7 @@ import { Certificates } from "@/components/portfolio/Certificates";
 import { Performance } from "@/components/portfolio/Performance";
 import { Achievements } from "@/components/portfolio/Achievements";
 import { Skills } from "@/components/portfolio/Skills";
+import { Platforms } from "@/components/portfolio/Platforms";
 import { Projects } from "@/components/portfolio/Projects";
 import { Testimonials } from "@/components/portfolio/Testimonials";
 import { Goals } from "@/components/portfolio/Goals";
@@ -65,6 +66,7 @@ export default function Home() {
           subtitle="Languages, frameworks and problem-solving cores loaded into the engineering bay."
         />
         <Skills />
+        <Platforms />
         <Projects />
         <Testimonials />
         <Goals />

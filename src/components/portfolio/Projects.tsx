@@ -44,7 +44,7 @@ export function Projects() {
 
       <div className="mx-auto max-w-5xl">
         <SectionHeading
-          index="07 // ARCHIVE"
+          index="08 // ARCHIVE"
           title="PROJECT ARCHIVE"
           subtitle="Selected builds from the engineering bay — each one a transmission from the workshop."
           accent="cyan"
