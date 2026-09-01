@@ -1,320 +1,273 @@
-"use client"
+"use client";
 
-import { useState, type FormEvent } from "react"
-import {
-  Github,
-  GraduationCap,
-  Instagram,
-  Languages,
-  Linkedin,
-  Loader2,
-  Send,
-  Twitter,
-  Zap,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { useToast } from "@/hooks/use-toast"
-import SectionHeading from "./SectionHeading"
-import Reveal from "./Reveal"
-import { PERSONAL } from "@/lib/portfolio-data"
+import { motion } from "framer-motion";
+import { useState } from "react";
+import { Send, Radio, Mail, Github, Linkedin, CheckCircle2 } from "lucide-react";
+import { PROFILE } from "@/lib/portfolio-data";
+import { SectionHeading } from "./SectionHeading";
+import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { TransmissionCounter } from "./TransmissionCounter";
 
-interface ContactPostResponse {
-  success: boolean
-  message?: string
-  error?: string
-}
+export function Contact() {
+  const { toast } = useToast();
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    frequency: "EARTH",
+    message: "",
+  });
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-const INFO_ITEMS = [
-  {
-    icon: GraduationCap,
-    label: "Currently",
-    value: "B.Tech CSE — Government Engineering College, Sheikhpura",
-  },
-  {
-    icon: Languages,
-    label: "Learning",
-    value: "German (Deutsch) · Japanese (日本語)",
-  },
-] as const
-
-const SOCIALS = [
-  { icon: Github, label: "Sachin Kumar on GitHub" },
-  { icon: Linkedin, label: "Sachin Kumar on LinkedIn" },
-  { icon: Twitter, label: "Sachin Kumar on Twitter" },
-  { icon: Instagram, label: "Sachin Kumar on Instagram" },
-] as const
-
-export default function Contact() {
-  const { toast } = useToast()
-  const [name, setName] = useState("")
-  const [email, setEmail] = useState("")
-  const [subject, setSubject] = useState("Hello")
-  const [message, setMessage] = useState("")
-  const [sending, setSending] = useState(false)
-  const [delivered, setDelivered] = useState(false)
-
-  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-
-    const trimmedName = name.trim()
-    const trimmedEmail = email.trim()
-    const trimmedMessage = message.trim()
-
-    if (trimmedName.length < 2) {
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name || !form.email || !form.message) {
       toast({
+        title: "Signal incomplete",
+        description: "Name, email and message are required to transmit.",
         variant: "destructive",
-        title: "Invalid name",
-        description: "Please enter at least 2 characters.",
-      })
-      return
+      });
+      return;
     }
-    if (!EMAIL_REGEX.test(trimmedEmail)) {
-      toast({
-        variant: "destructive",
-        title: "Invalid email",
-        description: "Please provide a valid email address.",
-      })
-      return
-    }
-    if (trimmedMessage.length < 10) {
-      toast({
-        variant: "destructive",
-        title: "Message too short",
-        description: "Please write at least 10 characters.",
-      })
-      return
-    }
-
-    setSending(true)
+    setSending(true);
     try {
       const res = await fetch("/api/contact", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: trimmedName,
-          email: trimmedEmail,
-          subject: subject.trim() || "Hello",
-          message: trimmedMessage,
-        }),
-      })
-      const data = (await res.json()) as ContactPostResponse
-
-      if (!res.ok || !data.success) {
-        toast({
-          variant: "destructive",
-          title: "Message not sent",
-          description: data.error ?? "Something went wrong. Please try again later.",
-        })
-        return
-      }
-
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) throw new Error("transmission failed");
+      setSent(true);
       toast({
-        title: "Message sent",
-        description: data.message ?? "Sachin will get back to you soon.",
-      })
-      setName("")
-      setEmail("")
-      setSubject("Hello")
-      setMessage("")
-      setDelivered(true)
-      window.setTimeout(() => setDelivered(false), 5000)
+        title: "Signal transmitted",
+        description: "Your message has been beamed across the cosmos.",
+      });
+      setForm({ name: "", email: "", frequency: "EARTH", message: "" });
     } catch {
       toast({
+        title: "Transmission failed",
+        description: "Cosmic interference detected. Try again later.",
         variant: "destructive",
-        title: "Message not sent",
-        description: "Network issue — please try again.",
-      })
+      });
     } finally {
-      setSending(false)
+      setSending(false);
+      setTimeout(() => setSent(false), 4000);
     }
-  }
+  };
 
   return (
-    <section id="contact" className="relative overflow-hidden py-24 sm:py-32">
-      {/* Ambient layers */}
-      <div className="grid-bg absolute inset-0 opacity-40" aria-hidden="true" />
-      <div
-        className="absolute -left-28 bottom-12 h-96 w-96 rounded-full bg-violet-500/10 blur-3xl"
-        aria-hidden="true"
-      />
-      <div
-        className="absolute -right-24 top-10 h-96 w-96 rounded-full bg-fuchsia-500/10 blur-3xl"
-        aria-hidden="true"
-      />
+    <section id="contact" className="relative px-4 py-20 sm:py-28">
+      <div className="pointer-events-none absolute right-1/4 top-0 h-72 w-72 rounded-full bg-[oklch(0.82_0.22_165/0.06)] blur-3xl" />
 
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-5xl">
         <SectionHeading
-          id="contact"
-          title={
-            <>Get in <span className="text-gradient">Touch</span></>
-          }
-          description="Have a question, an idea, or just want to say hello? Send me a message and I'll get back to you."
+          index="10 // SIGNAL"
+          title="OPEN A CHANNEL"
+          subtitle="Transmit a message across the void — I monitor all incoming frequencies."
+          accent="cyan"
         />
 
-        <div className="mt-14 grid items-start gap-12 lg:grid-cols-2">
-          {/* LEFT — statement + info */}
-          <Reveal>
-            <p className="font-display text-2xl leading-snug sm:text-3xl">
-              Have an idea, an opportunity, or just want to say{" "}
-              <span className="text-gradient">hello</span>?
-            </p>
-
-            <ul className="mt-8 space-y-4">
-              {INFO_ITEMS.map((item) => (
-                <li key={item.label} className="flex items-center gap-3.5">
-                  <div className="glass flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
-                    <item.icon className="h-5 w-5 text-fuchsia-300" aria-hidden="true" />
-                  </div>
-                  <div>
-                    <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                      {item.label}
-                    </p>
-                    <p className="text-sm font-medium">{item.value}</p>
-                  </div>
-                </li>
-              ))}
-              <li className="flex items-center gap-3.5">
-                <div className="glass flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
-                  <Zap className="h-5 w-5 text-fuchsia-300" aria-hidden="true" />
+        <div className="grid gap-6 lg:grid-cols-[1fr_1.3fr]">
+          {/* Contact info */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-col gap-4"
+          >
+            <div className="relative overflow-hidden rounded-2xl glass-panel p-6">
+              <div className="absolute -left-12 -top-12 h-40 w-40 rounded-full bg-[oklch(0.78_0.20_195/0.1)] blur-3xl" />
+              <div className="relative">
+                <div className="mb-4 flex items-center gap-2">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[oklch(0.82_0.22_165)] opacity-75" />
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[oklch(0.82_0.22_165)]" />
+                  </span>
+                  <span className="font-mono text-[10px] tracking-[0.25em] text-muted-foreground">
+                    RECEIVER ONLINE
+                  </span>
                 </div>
-                <div>
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                    Status
-                  </p>
-                  <p className="flex items-center gap-2 text-sm font-medium text-amber-300">
-                    <span
-                      className="animate-pulse-glow h-1.5 w-1.5 rounded-full bg-amber-300"
-                      aria-hidden="true"
-                    />
-                    {PERSONAL.availability}
-                  </p>
+                <h3 className="font-display text-xl font-bold">
+                  Receiver: <span className="text-gradient-alien">Sachin Kumar</span>
+                </h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Currently docked at Government Engineering College, Sheikhpura.
+                  Open to collaboration, mentorship and cosmic-grade projects.
+                </p>
+                {/* Live transmission counter */}
+                <div className="mt-4">
+                  <TransmissionCounter />
                 </div>
-              </li>
-            </ul>
-
-            <div className="mt-8 flex gap-3">
-              {SOCIALS.map((social) => (
-                <a
-                  key={social.label}
-                  href="#"
-                  aria-label={social.label}
-                  className="glass focus-visible:ring-2 focus-visible:ring-fuchsia-400/60 flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-all duration-300 hover:-translate-y-1 hover:border-fuchsia-400/50 hover:text-fuchsia-300 focus-visible:outline-none"
-                >
-                  <social.icon className="h-5 w-5" aria-hidden="true" />
-                </a>
-              ))}
+              </div>
             </div>
-          </Reveal>
 
-          {/* RIGHT — message form */}
-          <Reveal delay={0.15}>
-            <div className="glass-strong relative overflow-hidden rounded-3xl p-6 sm:p-8">
-              <div
-                className="absolute -right-20 -top-20 h-52 w-52 rounded-full bg-fuchsia-500/15 blur-3xl"
-                aria-hidden="true"
-              />
-
-              <p className="kicker relative">{"// SEND A MESSAGE"}</p>
-
-              <form noValidate onSubmit={handleSubmit} className="relative mt-6 space-y-5">
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="contact-name" className="text-xs uppercase tracking-widest">
-                      Name
-                    </Label>
-                    <Input
-                      id="contact-name"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="Your name"
-                      required
-                      maxLength={80}
-                      className="border-white/10 bg-white/5 focus-visible:ring-fuchsia-400/50"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="contact-email" className="text-xs uppercase tracking-widest">
-                      Email
-                    </Label>
-                    <Input
-                      id="contact-email"
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      required
-                      maxLength={120}
-                      className="border-white/10 bg-white/5 focus-visible:ring-fuchsia-400/50"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="contact-subject" className="text-xs uppercase tracking-widest">
-                    Subject
-                  </Label>
-                  <Input
-                    id="contact-subject"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    placeholder="Hello"
-                    maxLength={120}
-                    className="border-white/10 bg-white/5 focus-visible:ring-fuchsia-400/50"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="contact-message" className="text-xs uppercase tracking-widest">
-                    Message
-                  </Label>
-                  <Textarea
-                    id="contact-message"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    placeholder="Tell me about your idea, opportunity, or just say hello..."
-                    required
-                    rows={5}
-                    maxLength={2000}
-                    className="resize-none border-white/10 bg-white/5 focus-visible:ring-fuchsia-400/50"
-                  />
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={sending}
-                  className="glow-violet h-12 w-full rounded-xl bg-gradient-to-r from-violet-500 via-fuchsia-500 to-amber-400 font-semibold text-white hover:opacity-90 disabled:opacity-60"
-                >
-                  {sending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4" aria-hidden="true" />
-                      Send Message
-                    </>
-                  )}
-                </Button>
-
-                {delivered ? (
-                  <p
-                    className="chip justify-center border-amber-300/40 text-center text-amber-300"
-                    role="status"
+            {/* Socials */}
+            <div className="grid gap-3">
+              {[
+                {
+                  icon: Mail,
+                  label: "EMAIL",
+                  value: "sachin@example.com",
+                  href: "mailto:sachin@example.com",
+                  color: "alien",
+                },
+                {
+                  icon: Github,
+                  label: "GITHUB",
+                  value: "@sachinkumar",
+                  href: "#",
+                  color: "cyan",
+                },
+                {
+                  icon: Linkedin,
+                  label: "LINKEDIN",
+                  value: "in/sachinkumar",
+                  href: "#",
+                  color: "plasma",
+                },
+              ].map((s) => {
+                const color =
+                  s.color === "alien"
+                    ? "oklch(0.82 0.22 165)"
+                    : s.color === "cyan"
+                    ? "oklch(0.78 0.20 195)"
+                    : "oklch(0.72 0.25 320)";
+                return (
+                  <a
+                    key={s.label}
+                    href={s.href}
+                    className="group flex items-center gap-3 rounded-xl border border-[oklch(0.82_0.22_165/0.15)] bg-[oklch(0.10_0.02_280/0.5)] p-3.5 transition-all hover:border-[oklch(0.82_0.22_165/0.4)] hover:bg-[oklch(0.12_0.03_280/0.6)]"
                   >
-                    Message delivered — talk soon!
-                  </p>
-                ) : null}
-              </form>
+                    <span
+                      className="flex h-10 w-10 items-center justify-center rounded-lg transition-transform group-hover:scale-110"
+                      style={{
+                        background: `${color} / 0.12`,
+                        border: `1px solid ${color} / 0.3`,
+                      } as React.CSSProperties}
+                    >
+                      <s.icon className="h-4.5 w-4.5" style={{ color }} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-mono text-[9px] tracking-[0.2em] text-muted-foreground">
+                        {s.label}
+                      </div>
+                      <div className="truncate text-sm font-medium text-foreground">
+                        {s.value}
+                      </div>
+                    </div>
+                    <Send
+                      className="h-3.5 w-3.5 text-muted-foreground transition-all group-hover:translate-x-0.5 group-hover:text-[oklch(0.82_0.22_165)]"
+                    />
+                  </a>
+                );
+              })}
             </div>
-          </Reveal>
+          </motion.div>
+
+          {/* Transmission form */}
+          <motion.form
+            onSubmit={onSubmit}
+            initial={{ opacity: 0, x: 20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{ duration: 0.5 }}
+            className="relative overflow-hidden rounded-2xl glass-panel p-6 sm:p-8 scanlines"
+          >
+            <div className="absolute -right-16 -bottom-16 h-48 w-48 rounded-full bg-[oklch(0.72_0.25_320/0.1)] blur-3xl" />
+            <div className="relative">
+              {/* Terminal header */}
+              <div className="mb-5 flex items-center justify-between border-b border-[oklch(0.82_0.22_165/0.15)] pb-3">
+                <div className="flex items-center gap-2">
+                  <Radio className="h-4 w-4 text-[oklch(0.82_0.22_165)] animate-flicker" />
+                  <span className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
+                    /transmit/new-signal
+                  </span>
+                </div>
+                <span className="font-mono text-[9px] tracking-[0.2em] text-[oklch(0.82_0.22_165)]">
+                  ENCRYPTED
+                </span>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
+                    SENDER NAME *
+                  </label>
+                  <Input
+                    value={form.name}
+                    onChange={(e) =>
+                      setForm({ ...form, name: e.target.value })
+                    }
+                    placeholder="Your identifier"
+                    className="border-[oklch(0.82_0.22_165/0.2)] bg-[oklch(0.08_0.02_280/0.6)] font-mono text-sm placeholder:text-muted-foreground/50 focus-visible:border-[oklch(0.82_0.22_165)] focus-visible:ring-[oklch(0.82_0.22_165/0.3)]"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
+                    RETURN FREQUENCY *
+                  </label>
+                  <Input
+                    type="email"
+                    value={form.email}
+                    onChange={(e) =>
+                      setForm({ ...form, email: e.target.value })
+                    }
+                    placeholder="you@sector.io"
+                    className="border-[oklch(0.82_0.22_165/0.2)] bg-[oklch(0.08_0.02_280/0.6)] font-mono text-sm placeholder:text-muted-foreground/50 focus-visible:border-[oklch(0.82_0.22_165)] focus-visible:ring-[oklch(0.82_0.22_165/0.3)]"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-1.5">
+                <label className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
+                  MESSAGE PAYLOAD *
+                </label>
+                <Textarea
+                  value={form.message}
+                  onChange={(e) =>
+                    setForm({ ...form, message: e.target.value })
+                  }
+                  placeholder="Encode your transmission here..."
+                  rows={5}
+                  className="resize-none border-[oklch(0.82_0.22_165/0.2)] bg-[oklch(0.08_0.02_280/0.6)] font-mono text-sm placeholder:text-muted-foreground/50 focus-visible:border-[oklch(0.82_0.22_165)] focus-visible:ring-[oklch(0.82_0.22_165/0.3)]"
+                />
+              </div>
+
+              <Button
+                type="submit"
+                disabled={sending}
+                className="group relative mt-5 h-12 w-full overflow-hidden bg-[oklch(0.82_0.22_165)] font-display text-sm font-bold tracking-wider text-[oklch(0.10_0.02_280)] hover:bg-[oklch(0.88_0.22_165)] hover:shadow-[0_0_30px_rgba(120,255,200,0.5)] disabled:opacity-60"
+              >
+                <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+                {sent ? (
+                  <>
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    SIGNAL RECEIVED
+                  </>
+                ) : sending ? (
+                  <>
+                    <Radio className="mr-2 h-4 w-4 animate-pulse" />
+                    TRANSMITTING...
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" />
+                    TRANSMIT SIGNAL
+                  </>
+                )}
+              </Button>
+
+              <p className="mt-3 text-center font-mono text-[9px] tracking-[0.2em] text-muted-foreground">
+                AVG RESPONSE: 24 EARTH HOURS · ENCRYPTED CHANNEL
+              </p>
+            </div>
+          </motion.form>
         </div>
       </div>
     </section>
-  )
+  );
 }

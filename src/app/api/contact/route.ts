@@ -1,41 +1,80 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { z } from "zod";
 
-const contactSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters").max(80),
-  email: z.string().email("Please provide a valid email"),
-  subject: z.string().min(2).max(120).default("Hello"),
-  message: z.string().min(10, "Message must be at least 10 characters").max(2000),
-});
+interface ContactPayload {
+  name?: string;
+  email?: string;
+  frequency?: string;
+  message?: string;
+}
 
-export async function POST(req: NextRequest) {
+/**
+ * Receives "transmissions" from the portfolio contact form and persists
+ * them to SQLite via Prisma. Falls back to an in-memory buffer if the
+ * database is unavailable so the form never hard-fails.
+ */
+const fallbackBuffer: Array<ContactPayload & { receivedAt: string }> = [];
+
+async function saveTransmission(payload: ContactPayload & { receivedAt: string }) {
   try {
-    const body = await req.json();
-    const parsed = contactSchema.safeParse(body);
+    const record = await db.transmission.create({
+      data: {
+        name: payload.name!,
+        email: payload.email!,
+        frequency: payload.frequency ?? "EARTH",
+        message: payload.message!,
+      },
+    });
+    return { persisted: true as const, id: record.id };
+  } catch (err) {
+    // Fallback: keep in memory so we never lose the message during a DB hiccup
+    fallbackBuffer.push(payload);
+    if (fallbackBuffer.length > 100) fallbackBuffer.shift();
+    console.error("[SIGNAL] DB write failed, buffered in-memory:", err);
+    return { persisted: false as const, id: null };
+  }
+}
 
-    if (!parsed.success) {
+export async function POST(req: Request) {
+  try {
+    const body = (await req.json()) as ContactPayload;
+
+    if (!body.name || !body.email || !body.message) {
       return NextResponse.json(
-        { success: false, error: parsed.error.issues[0]?.message ?? "Invalid input" },
+        { ok: false, error: "Missing required fields: name, email, message" },
         { status: 400 }
       );
     }
 
-    const { name, email, subject, message } = parsed.data;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(body.email)) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid return frequency (email)" },
+        { status: 400 }
+      );
+    }
 
-    const saved = await db.contactMessage.create({
-      data: { name, email, subject, message },
-    });
+    if (body.message.length > 5000) {
+      return NextResponse.json(
+        { ok: false, error: "Message payload exceeds 5000 characters" },
+        { status: 400 }
+      );
+    }
+
+    const receivedAt = new Date().toISOString();
+    const result = await saveTransmission({ ...body, receivedAt });
+
+    console.log("[SIGNAL] New transmission from:", body.email, "→ persisted:", result.persisted);
 
     return NextResponse.json({
-      success: true,
-      id: saved.id,
-      message: "Message received! Sachin will get back to you soon.",
+      ok: true,
+      id: result.id,
+      persisted: result.persisted,
+      message: "Signal received and decoded successfully.",
     });
-  } catch (error) {
-    console.error("Contact API error:", error);
+  } catch {
     return NextResponse.json(
-      { success: false, error: "Something went wrong. Please try again later." },
+      { ok: false, error: "Failed to decode transmission" },
       { status: 500 }
     );
   }
@@ -43,9 +82,42 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   try {
-    const count = await db.contactMessage.count();
-    return NextResponse.json({ success: true, total: count });
+    const [total, unread] = await Promise.all([
+      db.transmission.count(),
+      db.transmission.count({ where: { read: false } }),
+    ]);
+    const latest = await db.transmission.findFirst({
+      orderBy: { createdAt: "desc" },
+      select: {
+        name: true,
+        email: true,
+        message: true,
+        createdAt: true,
+      },
+    });
+    return NextResponse.json({
+      ok: true,
+      total,
+      unread,
+      buffered: fallbackBuffer.length,
+      latest: latest
+        ? {
+            name: latest.name,
+            email: latest.email,
+            message: latest.message,
+            receivedAt: latest.createdAt.toISOString(),
+          }
+        : fallbackBuffer[fallbackBuffer.length - 1] ?? null,
+    });
   } catch {
-    return NextResponse.json({ success: true, total: 0 });
+    // DB unavailable — return the in-memory buffer stats instead
+    return NextResponse.json({
+      ok: true,
+      total: fallbackBuffer.length,
+      unread: fallbackBuffer.length,
+      buffered: fallbackBuffer.length,
+      latest: fallbackBuffer[fallbackBuffer.length - 1] ?? null,
+      degraded: true,
+    });
   }
 }

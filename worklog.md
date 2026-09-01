@@ -89,3 +89,33 @@ Work Log:
 Stage Summary:
 - Site is now a clean, professional dark portfolio without 3D/photo/location elements, college corrected to GEC Sheikhpura
 - All interactive features still functional (tabs, guestbook, contact, nav, back-to-top, visitor counter)
+
+---
+Task ID: 6
+Agent: main (Z.ai Code) — cron webDevReview round 1
+Task: User uploaded reference workspace tar — "make it like this use its content" — adopt alien-themed portfolio design wholesale
+
+Work Log:
+- Extracted /home/z/my-project/upload/workspace-*.tar to /tmp/reference; studied structure (19 portfolio components, 11 effect components, 2 API routes, Prisma Transmission+Testimonial models)
+- Adopted wholesale: src/components/portfolio/*, src/components/effects/*, src/hooks/{use-sound,use-tilt}.ts, src/lib/portfolio-data.ts, src/app/{page,layout,globals.css}, public/assets/* (8 images), prisma schema, api/contact + api/testimonials routes; removed old api/guestbook + api/visits and old public/portfolio images
+- Dependency diff: reference needs nothing extra (kept three/fiber/drei/lenis installed but unused)
+- Fixed college name everywhere: Sitamarhi → Sheikhpura (portfolio-data.ts x5, layout.tsx metadata x2, About.tsx x2, Contact.tsx x1) — preserves user's factual correction
+- Generated missing /assets/proj-atlas.png via z-ai image (sci-fi holographic map, 1344x768) — referenced by ProjectDialog for Bihar Heritage Atlas but absent from tar
+- Fixed 3 pre-existing type errors from reference: bare `fill` props on lucide icons in Testimonials.tsx (boolean → fill="currentColor" x2); TiltCard glareColor union type widened to string + Record<string,string> lookup (fixes 4 errors in Achievements/Certificates/Projects)
+- Pushed Prisma schema (Transmission, Testimonial); had to restart dev server (stale PrismaClient cache: db.testimonial was undefined)
+- QA via agent-browser: 0 page errors; all 10 sections render + Sheikhpura confirmed, Sitamarhi absent; starfield canvas active; command palette Ctrl+K opens + navigates (Archive → scrollY 8965 exact); certificate dialog opens with real cert image; project dialog opens (PROJ.CIPHER-02); testimonial form end-to-end (submit → toast → appears in list); contact form end-to-end (persisted=true → toast → form cleared)
+- Fixed mobile horizontal overflow (450px vs 390px viewport): decorative absolute glow orbs escaping sections → changed body overflow-x:hidden → overflow-x:clip on html+body; verified 390=390 after fix
+- Mobile menu opens + navigates correctly (9 links, ARCHIVE → projects 8965)
+- VLM visual QA on 10 desktop screenshots: all sections render fully, no overlaps/broken layouts
+- tsc clean (only pre-existing examples/skills errors), eslint clean
+
+Stage Summary:
+- Project is now the alien/sci-fi themed "Cosmic Engineer" portfolio per user's reference: StarfieldCanvas, AlienCursor, ScrollProgress, SectionRail, CommandPalette (Ctrl+K), Konami easter egg, SoundToggle (WebAudio), TiltCards, ParallaxBreaks, 11 content sections incl. Certificates (TechBairn cert), Performance (SGPA telemetry), Achievements, Testimonials (live DB-backed with form), TransmissionCounter (live contact count in footer)
+- College name corrected to GEC Sheikhpura throughout; proj-atlas.png generated
+- All interactive flows browser-verified; mobile overflow fixed
+
+Unresolved issues / next-phase priorities:
+- Social links point to "#" placeholders (user should supply real GitHub/LinkedIn/Email)
+- Testimonials currently has QA test data (Test Visitor, Ananya Singh) — harmless but could be cleared
+- Konami easter egg + sound toggle not explicitly tested this round (code intact from reference)
+- Consider: seed a few real testimonials, add projects' real links, maybe site favicon with alien glyph

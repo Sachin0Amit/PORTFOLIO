@@ -1,114 +1,158 @@
-"use client"
+"use client";
 
-import { useEffect, useRef, useState } from "react"
-import { animate, useInView } from "framer-motion"
-import { GraduationCap, School, Trophy, CalendarDays } from "lucide-react"
-import SectionHeading from "./SectionHeading"
-import Reveal from "./Reveal"
-import { HERO_STATS, PERSONAL } from "@/lib/portfolio-data"
+import { motion } from "framer-motion";
+import { MapPin, Calendar, GraduationCap, Code2 } from "lucide-react";
+import { PROFILE } from "@/lib/portfolio-data";
+import { SectionHeading } from "./SectionHeading";
+import { TiltCard } from "@/components/effects/TiltCard";
 
-interface StatCounterProps {
-  value: number
-  decimals: number
-  suffix: string
-  label: string
-}
-
-function StatCounter({ value, decimals, suffix, label }: StatCounterProps) {
-  const ref = useRef<HTMLDivElement>(null)
-  const inView = useInView(ref, { once: true, margin: "-40px" })
-  const [display, setDisplay] = useState((0).toFixed(decimals))
-
-  useEffect(() => {
-    if (!inView) return
-    const controls = animate(0, value, {
-      duration: 1.8,
-      ease: [0.21, 0.47, 0.32, 0.98],
-      onUpdate: (latest) => setDisplay(latest.toFixed(decimals)),
-    })
-    return () => controls.stop()
-  }, [inView, value, decimals])
-
+export function About() {
   return (
-    <div ref={ref} className="flex flex-col items-center gap-1.5 text-center">
-      <span className="font-display text-2xl font-bold tabular-nums sm:text-3xl">
-        {display}
-        {suffix ? <span className="text-gradient-warm">{suffix}</span> : null}
-      </span>
-      <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-        {label}
-      </span>
-    </div>
-  )
-}
+    <section id="about" className="relative px-4 py-20 sm:py-28">
+      <div className="mx-auto max-w-5xl">
+        <SectionHeading
+          index="02 // BIOGRAPHY"
+          title="ABOUT THE UNIT"
+          subtitle="Identity dossier of the carbon-based engineer currently orbiting Sheikhpura."
+          accent="cyan"
+        />
 
-const QUICK_FACTS = [
-  { label: "Degree", value: "B.Tech CSE", icon: GraduationCap },
-  { label: "Year", value: "2nd Year", icon: CalendarDays },
-  { label: "College", value: "GEC Sheikhpura", icon: School },
-  { label: "Sem 1 SGPA", value: "8.1 / 10", icon: Trophy },
-]
-
-export default function About() {
-  return (
-    <section id="about" className="relative overflow-hidden py-24 sm:py-32">
-      {/* Ambient layers */}
-      <div className="star-field absolute inset-0 opacity-40" aria-hidden="true" />
-      <div
-        className="absolute -left-32 top-24 h-96 w-96 rounded-full bg-violet-500/10 blur-3xl"
-        aria-hidden="true"
-      />
-      <div
-        className="absolute -right-24 bottom-12 h-96 w-96 rounded-full bg-fuchsia-500/10 blur-3xl"
-        aria-hidden="true"
-      />
-
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
-        <SectionHeading id="about" title={<>About <span className="text-gradient">Me</span></>} />
-
-        <Reveal className="mx-auto mt-14 max-w-3xl">
-          <div className="space-y-4">
-            {PERSONAL.bio.map((paragraph, i) => (
-              <p
-                key={i}
-                className={
-                  i === 0
-                    ? "leading-relaxed text-foreground/90"
-                    : "leading-relaxed text-muted-foreground"
-                }
-              >
-                {paragraph}
-              </p>
-            ))}
-          </div>
-
-          {/* quick facts */}
-          <div className="mt-10 grid grid-cols-2 gap-3">
-            {QUICK_FACTS.map((fact) => (
-              <div key={fact.label} className="glass rounded-xl p-4">
-                <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-widest text-muted-foreground">
-                  <fact.icon className="h-3.5 w-3.5 text-fuchsia-300" aria-hidden="true" />
-                  {fact.label}
+        <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+          {/* Bio panel */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{ duration: 0.6 }}
+            className="relative overflow-hidden rounded-2xl glass-panel p-6 sm:p-8"
+          >
+            <div className="absolute -right-20 -top-20 h-60 w-60 rounded-full bg-[oklch(0.78_0.20_195/0.08)] blur-3xl" />
+            <div className="relative">
+              {/* Terminal header */}
+              <div className="mb-5 flex items-center gap-2 border-b border-[oklch(0.82_0.22_165/0.15)] pb-3">
+                <div className="flex gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.65_0.24_25/0.8)]" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.75_0.22_90/0.8)]" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-[oklch(0.82_0.22_165/0.8)]" />
                 </div>
-                <p className="mt-1.5 text-sm font-medium">{fact.value}</p>
+                <span className="ml-2 font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
+                  /bio/sachin-kumar.log
+                </span>
               </div>
-            ))}
-          </div>
 
-          {/* animated stats */}
-          <div className="glass mt-8 grid grid-cols-2 gap-3 rounded-2xl p-5 sm:grid-cols-4">
-            {HERO_STATS.map((stat) => (
-              <StatCounter
-                key={stat.label}
-                value={stat.value}
-                decimals={stat.decimals}
-                suffix={stat.suffix}
-                label={stat.label}
-              />
-            ))}
-          </div>
-        </Reveal>
+              {PROFILE.bio.map((p, i) => (
+                <motion.p
+                  key={i}
+                  initial={{ opacity: 0 }}
+                  whileInView={{ opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.2 + i * 0.15, duration: 0.6 }}
+                  className="mb-4 text-[15px] leading-relaxed text-foreground/90 last:mb-0"
+                >
+                  <span className="mr-2 font-mono text-[oklch(0.82_0.22_165)]">
+                    {">"}
+                  </span>
+                  {p}
+                </motion.p>
+              ))}
+
+              {/* Inline tags */}
+              <div className="mt-6 flex flex-wrap gap-2">
+                {[
+                  "CSE Undergrad",
+                  "Bihar-Origin",
+                  "Polyglot-in-Training",
+                  "Open Systems",
+                  "Curiosity-Driven",
+                ].map((t) => (
+                  <span
+                    key={t}
+                    className="rounded-full border border-[oklch(0.82_0.22_165/0.2)] bg-[oklch(0.10_0.02_280/0.5)] px-3 py-1 font-mono text-[10px] tracking-[0.15em] text-muted-foreground"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Identity card */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-60px" }}
+            transition={{ duration: 0.6, delay: 0.15 }}
+          >
+            <TiltCard max={9} scale={1.03} glareColor="plasma" className="h-full">
+              <div className="relative h-full overflow-hidden rounded-2xl glass-panel-plasma p-6 holo-border">
+                <div className="absolute -left-16 -bottom-16 h-48 w-48 rounded-full bg-[oklch(0.72_0.25_320/0.1)] blur-3xl" />
+                <div className="relative">
+                  {/* Avatar / sigil */}
+                  <div className="mb-5 flex items-center gap-4">
+                    <div className="relative h-16 w-16 shrink-0">
+                      <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-[oklch(0.82_0.22_165)] via-[oklch(0.78_0.20_195)] to-[oklch(0.72_0.25_320)] opacity-80 blur-md" />
+                      <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl border border-[oklch(0.82_0.22_165/0.4)] bg-[oklch(0.08_0.02_280)] font-display text-2xl font-black text-gradient-alien">
+                        SK
+                      </div>
+                    </div>
+                    <div>
+                      <div className="font-display text-lg font-bold tracking-wide">
+                        {PROFILE.name}
+                      </div>
+                      <div className="font-mono text-[10px] tracking-[0.2em] text-[oklch(0.78_0.20_195)]">
+                        {PROFILE.callsign}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Data rows */}
+                  <ul className="space-y-3">
+                    {[
+                      {
+                        icon: MapPin,
+                        label: "ORIGIN",
+                        value: PROFILE.origin,
+                      },
+                      {
+                        icon: GraduationCap,
+                        label: "DOCKED AT",
+                        value: "GEC Sheikhpura",
+                      },
+                      {
+                        icon: Code2,
+                        label: "DISCIPLINE",
+                        value: "CSE · 2nd Year",
+                      },
+                      {
+                        icon: Calendar,
+                        label: "STATUS",
+                        value: "Acquiring Knowledge",
+                      },
+                    ].map((row) => (
+                      <li
+                        key={row.label}
+                        className="flex items-center gap-3 rounded-xl border border-[oklch(0.72_0.25_320/0.15)] bg-[oklch(0.08_0.02_280/0.4)] px-3 py-2.5"
+                      >
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[oklch(0.72_0.25_320/0.12)]">
+                          <row.icon className="h-4 w-4 text-[oklch(0.72_0.25_320)]" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="font-mono text-[9px] tracking-[0.2em] text-muted-foreground">
+                            {row.label}
+                          </div>
+                          <div className="truncate text-sm font-medium text-foreground">
+                            {row.value}
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </TiltCard>
+          </motion.div>
+        </div>
       </div>
     </section>
-  )
+  );
 }

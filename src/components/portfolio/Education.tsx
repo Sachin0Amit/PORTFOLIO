@@ -1,145 +1,97 @@
-"use client"
+"use client";
 
-import { motion } from "framer-motion"
-import { BookOpen, GraduationCap, MapPin, School } from "lucide-react"
-import SectionHeading from "./SectionHeading"
-import Reveal from "./Reveal"
-import { EDUCATION } from "@/lib/portfolio-data"
+import { motion } from "framer-motion";
+import { School, BookOpen, Rocket, MapPin } from "lucide-react";
+import { PROFILE } from "@/lib/portfolio-data";
+import { SectionHeading } from "./SectionHeading";
+import { TiltCard } from "@/components/effects/TiltCard";
 
-const EDUCATION_ICONS = {
-  School,
-  BookOpen,
-  GraduationCap,
-} as const
+const ICONS = [School, BookOpen, Rocket];
 
-type EducationIconName = keyof typeof EDUCATION_ICONS
-
-const ACCENT_TAG_STYLES: Record<string, string> = {
-  violet: "border-violet-400/30 text-violet-200",
-  fuchsia: "border-fuchsia-400/30 text-fuchsia-200",
-  amber: "border-amber-300/30 text-amber-200",
-}
-
-export default function Education() {
+export function Education() {
   return (
-    <section id="education" className="relative overflow-hidden py-24 sm:py-32">
-      {/* Ambient layers */}
-      <div className="grid-bg absolute inset-0 opacity-50" aria-hidden="true" />
-      <div
-        className="absolute left-1/2 top-0 h-80 w-[36rem] -translate-x-1/2 rounded-full bg-violet-500/10 blur-3xl"
-        aria-hidden="true"
-      />
-      <div
-        className="absolute -left-24 bottom-10 h-80 w-80 rounded-full bg-amber-300/10 blur-3xl"
-        aria-hidden="true"
-      />
+    <section id="education" className="relative px-4 py-20 sm:py-28">
+      {/* Section ambient */}
+      <div className="pointer-events-none absolute left-1/2 top-1/3 h-72 w-72 -translate-x-1/2 rounded-full bg-[oklch(0.72_0.25_320/0.06)] blur-3xl" />
 
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-5xl">
         <SectionHeading
-          id="education"
-          title={
-            <>
-              Edu<span className="text-gradient">cation</span>
-            </>
-          }
+          index="03 // JOURNEY.LOG"
+          title="EDUCATIONAL TRAJECTORY"
+          subtitle="From origin-seed to stellar dock — each waypoint recalibrated my trajectory."
+          accent="plasma"
         />
 
-        <div className="relative mt-16 lg:mt-20">
-          {/* timeline track */}
-          <div
-            className="absolute bottom-0 left-5 top-0 w-px bg-white/10 lg:left-1/2 lg:-translate-x-1/2"
-            aria-hidden="true"
-          />
-          {/* animated gradient line */}
-          <motion.div
-            initial={{ scaleY: 0 }}
-            whileInView={{ scaleY: 1 }}
-            viewport={{ once: true, margin: "-60px" }}
-            transition={{ duration: 1.6, ease: [0.21, 0.47, 0.32, 0.98] }}
-            className="glow-violet absolute bottom-0 left-5 top-0 w-px origin-top bg-gradient-to-b from-violet-400 via-fuchsia-400 to-amber-300 lg:left-1/2 lg:-translate-x-1/2"
-            aria-hidden="true"
-          />
+        <div className="relative">
+          {/* Vertical line */}
+          <div className="absolute left-4 top-2 bottom-2 w-px bg-gradient-to-b from-[oklch(0.82_0.22_165/0.6)] via-[oklch(0.78_0.20_195/0.4)] to-[oklch(0.72_0.25_320/0.3)] sm:left-1/2 sm:-translate-x-1/2" />
 
-          {EDUCATION.map((entry, i) => {
-            const onLeft = i % 2 === 0
-            const Icon = EDUCATION_ICONS[entry.icon as EducationIconName] ?? GraduationCap
-
-            return (
-              <div
-                key={entry.school}
-                className="relative mb-12 pl-14 last:mb-0 lg:mb-16 lg:grid lg:grid-cols-2 lg:gap-12 lg:pl-0"
-              >
-                {/* node dot */}
-                <div
-                  className="absolute left-5 top-7 z-10 -translate-x-1/2 lg:left-1/2"
-                  aria-hidden="true"
+          <div className="space-y-8 sm:space-y-12">
+            {PROFILE.education.map((edu, i) => {
+              const Icon = ICONS[i % ICONS.length];
+              const isLeft = i % 2 === 0;
+              return (
+                <motion.div
+                  key={edu.title}
+                  initial={{ opacity: 0, y: 40 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-80px" }}
+                  transition={{ duration: 0.6, delay: i * 0.05 }}
+                  className={`relative flex items-start gap-6 pl-12 sm:pl-0 ${
+                    isLeft ? "sm:flex-row" : "sm:flex-row-reverse"
+                  }`}
                 >
-                  <div className="animate-pulse-glow flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-fuchsia-400 bg-background">
-                    <div className="h-1 w-1 rounded-full bg-amber-300" />
+                  {/* Node */}
+                  <div className="absolute left-4 top-1 z-10 -translate-x-1/2 sm:left-1/2">
+                    <div className="relative">
+                      <span className="absolute inset-0 -m-2 animate-ping rounded-full bg-[oklch(0.82_0.22_165/0.3)]" />
+                      <span className="relative flex h-8 w-8 items-center justify-center rounded-full border border-[oklch(0.82_0.22_165/0.5)] bg-[oklch(0.10_0.02_280)]">
+                        <Icon className="h-4 w-4 text-[oklch(0.82_0.22_165)]" />
+                      </span>
+                    </div>
                   </div>
-                </div>
 
-                <Reveal
-                  delay={i * 0.12}
-                  className={
-                    onLeft
-                      ? "lg:col-start-1 lg:row-start-1 lg:pr-12"
-                      : "lg:col-start-2 lg:row-start-1 lg:pl-12"
-                  }
-                >
-                  <article
-                    className={`glass rounded-2xl p-6 transition-all duration-300 hover:-translate-y-1 hover:border-fuchsia-400/40 ${
-                      onLeft ? "lg:text-right" : "lg:text-start"
-                    }`}
-                  >
-                    <div
-                      className={`flex items-center gap-4 ${
-                        onLeft ? "lg:flex-row-reverse" : ""
-                      }`}
-                    >
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20">
-                        <Icon className="h-5 w-5 text-fuchsia-300" aria-hidden="true" />
+                  {/* Card */}
+                  <div className="flex-1 sm:max-w-[calc(50%-2.5rem)]">
+                    <TiltCard max={8} scale={1.03} glareColor="cyan" className="h-full">
+                      <div className="group relative h-full overflow-hidden rounded-2xl glass-panel p-5 sm:p-6">
+                        <div className="absolute right-3 top-3 font-display text-5xl font-black text-[oklch(0.82_0.22_165/0.08)] transition-colors group-hover:text-[oklch(0.82_0.22_165/0.15)]">
+                          {edu.glyph}
+                        </div>
+                        <div className="relative">
+                          <span className="font-mono text-[10px] tracking-[0.25em] text-[oklch(0.78_0.20_195)] text-glow-cyan">
+                            {edu.phase}
+                          </span>
+                          <h3 className="mt-1.5 font-display text-lg font-bold tracking-wide sm:text-xl">
+                            {edu.title}
+                          </h3>
+                          <div className="mt-1 font-medium text-[oklch(0.82_0.22_165)]">
+                            {edu.place}
+                          </div>
+                          <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <MapPin className="h-3 w-3" />
+                            {edu.location}
+                            <span className="mx-1 text-[oklch(0.72_0.25_320)]">•</span>
+                            {edu.period}
+                          </div>
+                          <p className="mt-3 text-sm leading-relaxed text-foreground/80">
+                            {edu.detail}
+                          </p>
+                        </div>
+                        {/* Bottom accent bar */}
+                        <div className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-transparent via-[oklch(0.82_0.22_165/0.6)] to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
                       </div>
-                      <span className="chip ml-auto shrink-0">{entry.period}</span>
-                    </div>
+                    </TiltCard>
+                  </div>
 
-                    <p className="mt-4 font-mono text-[11px] uppercase tracking-[0.25em] text-fuchsia-300">
-                      {entry.level}
-                    </p>
-                    <h3 className="font-display mt-1.5 text-lg font-semibold sm:text-xl">
-                      {entry.school}
-                    </h3>
-                    <p className="mt-1 flex items-center gap-1.5 font-mono text-xs text-muted-foreground">
-                      <MapPin className="h-3 w-3 shrink-0 text-amber-300" aria-hidden="true" />
-                      {entry.place}
-                    </p>
-                    <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                      {entry.description}
-                    </p>
-
-                    <div
-                      className={`mt-4 flex flex-wrap gap-2 ${
-                        onLeft ? "lg:justify-end" : ""
-                      }`}
-                    >
-                      {entry.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className={`chip text-[10px] ${
-                            ACCENT_TAG_STYLES[entry.accent] ?? ""
-                          }`}
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </article>
-                </Reveal>
-              </div>
-            )
-          })}
+                  {/* Spacer for the other side (desktop) */}
+                  <div className="hidden flex-1 sm:block sm:max-w-[calc(50%-2.5rem)]" />
+                </motion.div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>
-  )
+  );
 }

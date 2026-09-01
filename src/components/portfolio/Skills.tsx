@@ -1,128 +1,161 @@
-"use client"
+"use client";
 
-import { motion } from "framer-motion"
-import { Code2, FlaskConical, Globe, Wrench } from "lucide-react"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import SectionHeading from "./SectionHeading"
-import Reveal from "./Reveal"
-import { CURRENTLY_LEARNING, SKILL_CATEGORIES, type SkillItem } from "@/lib/portfolio-data"
+import { motion } from "framer-motion";
+import { Cpu, Layers, Zap } from "lucide-react";
+import { PROFILE } from "@/lib/portfolio-data";
+import { SectionHeading } from "./SectionHeading";
+import { TiltCard } from "@/components/effects/TiltCard";
 
-const CATEGORY_ICONS = {
-  Code2,
-  Globe,
-  Wrench,
-} as const
+const CAT_ICONS = [Cpu, Layers, Zap];
+const CAT_ACCENTS = ["alien", "cyan", "plasma"] as const;
 
-type CategoryIconName = keyof typeof CATEGORY_ICONS
-
-interface SkillCardProps {
-  skill: SkillItem
-  index: number
-}
-
-function SkillCard({ skill, index }: SkillCardProps) {
+export function Skills() {
   return (
-    <div className="glass rounded-2xl p-5 transition-all duration-300 hover:-translate-y-1 hover:border-violet-400/40">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="text-sm font-medium">{skill.name}</span>
-        <span className="font-mono text-sm text-fuchsia-300">{skill.level}%</span>
-      </div>
-      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuenow={skill.level} aria-valuemin={0} aria-valuemax={100} aria-label={`${skill.name} proficiency`}>
-        <motion.div
-          initial={{ width: "0%" }}
-          whileInView={{ width: `${skill.level}%` }}
-          viewport={{ once: true, margin: "-40px" }}
-          transition={{ duration: 1.2, delay: 0.05 * index, ease: [0.21, 0.47, 0.32, 0.98] }}
-          className="h-full rounded-full bg-gradient-to-r from-violet-400 via-fuchsia-400 to-amber-300"
-        />
-      </div>
-    </div>
-  )
-}
+    <section id="skills" className="relative px-4 py-20 sm:py-28">
+      <div className="pointer-events-none absolute right-0 top-1/4 h-80 w-80 rounded-full bg-[oklch(0.82_0.22_165/0.05)] blur-3xl" />
 
-export default function Skills() {
-  return (
-    <section id="skills" className="relative overflow-hidden py-24 sm:py-32">
-      {/* Ambient layers */}
-      <div className="star-field absolute inset-0 opacity-30" aria-hidden="true" />
-      <div
-        className="absolute -left-24 top-1/3 h-96 w-96 rounded-full bg-fuchsia-500/10 blur-3xl"
-        aria-hidden="true"
-      />
-      <div
-        className="absolute -right-32 bottom-8 h-96 w-96 rounded-full bg-violet-500/10 blur-3xl"
-        aria-hidden="true"
-      />
-
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-5xl">
         <SectionHeading
-          id="skills"
-          title={
-            <>
-              My <span className="text-gradient">Skills</span>
-            </>
-          }
-          description="Where I stand today — always improving."
+          index="06 // ARSENAL"
+          title="TECH ARSENAL"
+          subtitle="Tools and frequencies currently loaded into the engineering core."
+          accent="alien"
         />
 
-        <Tabs defaultValue={SKILL_CATEGORIES[0].id} className="mt-14 w-full">
-          <TabsList className="flex w-full flex-wrap justify-center gap-1 rounded-full border border-white/10 bg-white/5 p-1.5 sm:w-fit">
-            {SKILL_CATEGORIES.map((category) => {
-              const Icon = CATEGORY_ICONS[category.icon as CategoryIconName] ?? Code2
-              return (
-                <TabsTrigger
-                  key={category.id}
-                  value={category.id}
-                  className="rounded-full px-5 py-2.5 font-mono text-xs uppercase tracking-widest data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-500 data-[state=active]:to-fuchsia-500 data-[state=active]:text-white data-[state=active]:shadow-lg"
-                >
-                  <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                  {category.title}
-                </TabsTrigger>
-              )
-            })}
-          </TabsList>
-
-          {SKILL_CATEGORIES.map((category) => {
-            const Icon = CATEGORY_ICONS[category.icon as CategoryIconName] ?? Code2
+        <div className="grid gap-5 md:grid-cols-3">
+          {PROFILE.skills.map((cat, ci) => {
+            const Icon = CAT_ICONS[ci % CAT_ICONS.length];
+            const accent = CAT_ACCENTS[ci % CAT_ACCENTS.length];
+            const accentColor =
+              accent === "alien"
+                ? "oklch(0.82 0.22 165)"
+                : accent === "cyan"
+                ? "oklch(0.78 0.20 195)"
+                : "oklch(0.72 0.25 320)";
             return (
-              <TabsContent key={category.id} value={category.id} className="mt-10">
-                <div className="mb-5 flex items-center gap-2.5">
-                  <Icon className="h-4 w-4 text-fuchsia-300" aria-hidden="true" />
-                  <span className="font-mono text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
-                    {category.subtitle}
-                  </span>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {category.skills.map((skill, i) => (
-                    <SkillCard key={skill.name} skill={skill} index={i} />
-                  ))}
-                </div>
-              </TabsContent>
-            )
-          })}
-        </Tabs>
+              <motion.div
+                key={cat.category}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.5, delay: ci * 0.1 }}
+              >
+                <TiltCard
+                  max={9}
+                  scale={1.04}
+                  glareColor={accent}
+                  className="h-full"
+                >
+                  <div className="group relative h-full overflow-hidden rounded-2xl glass-panel p-5 sm:p-6">
+                    <div
+                      className="absolute -right-12 -top-12 h-32 w-32 rounded-full blur-2xl opacity-40"
+                      style={{ background: `${accentColor} / 0.15)` }}
+                    />
+                    <div className="relative">
+                      <div className="mb-4 flex items-center gap-3">
+                        <span
+                          className="flex h-10 w-10 items-center justify-center rounded-xl"
+                          style={{
+                            background: `${accentColor} / 0.12`,
+                            border: `1px solid ${accentColor} / 0.3`,
+                          } as React.CSSProperties}
+                        >
+                          <Icon className="h-5 w-5" style={{ color: accentColor }} />
+                        </span>
+                        <div>
+                          <div className="font-display text-sm font-bold tracking-wide">
+                            {cat.category}
+                          </div>
+                          <div
+                            className="font-mono text-[9px] tracking-[0.2em]"
+                            style={{ color: accentColor }}
+                          >
+                            MODULE.0{ci + 1}
+                          </div>
+                        </div>
+                      </div>
 
-        {/* Currently in the lab */}
-        <Reveal delay={0.1} className="mt-12">
-          <div className="glass-strong rounded-2xl p-6">
-            <h3 className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.3em] text-amber-300">
-              <FlaskConical className="h-4 w-4" aria-hidden="true" />
-              Currently in the lab
-            </h3>
-            <div className="mt-4 flex flex-wrap gap-2.5">
-              {CURRENTLY_LEARNING.map((item) => (
-                <span key={item} className="chip">
-                  <span
-                    className="animate-pulse-glow h-1.5 w-1.5 rounded-full bg-amber-300"
-                    aria-hidden="true"
-                  />
-                  {item}
-                </span>
-              ))}
-            </div>
+                      <ul className="space-y-3">
+                        {cat.items.map((item, ii) => (
+                          <li key={item.name}>
+                            <div className="mb-1 flex items-center justify-between">
+                              <span className="text-sm font-medium text-foreground/90">
+                                {item.name}
+                              </span>
+                              <span
+                                className="font-mono text-[10px] tracking-wider"
+                                style={{ color: accentColor }}
+                              >
+                                {item.level}%
+                              </span>
+                            </div>
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[oklch(0.16_0.04_280)]">
+                              <motion.div
+                                initial={{ width: 0 }}
+                                whileInView={{ width: `${item.level}%` }}
+                                viewport={{ once: true }}
+                                transition={{
+                                  delay: 0.2 + ii * 0.08,
+                                  duration: 0.9,
+                                  ease: "easeOut",
+                                }}
+                                className="relative h-full rounded-full"
+                                style={{
+                                  background: `linear-gradient(90deg, ${accentColor}, ${accentColor.replace(
+                                    /0\.\d+\)$/,
+                                    "0.5)"
+                                  )})`,
+                                }}
+                              >
+                                <div className="absolute inset-0 animate-shimmer" />
+                              </motion.div>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </TiltCard>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        {/* Marquee strip */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.4 }}
+          className="relative mt-8 overflow-hidden rounded-2xl border border-[oklch(0.82_0.22_165/0.15)] bg-[oklch(0.08_0.02_280/0.5)] py-4"
+        >
+          <div className="flex animate-[scroll_30s_linear_infinite] gap-8 whitespace-nowrap">
+            {[
+              "C", "C++", "Python", "JavaScript", "HTML", "CSS", "Git",
+              "Linux", "Data Structures", "Algorithms", "OOP", "React",
+              "Next.js", "SQL", "Problem Solving",
+              "C", "C++", "Python", "JavaScript", "HTML", "CSS", "Git",
+              "Linux", "Data Structures", "Algorithms", "OOP", "React",
+              "Next.js", "SQL", "Problem Solving",
+            ].map((t, i) => (
+              <span
+                key={i}
+                className="font-display text-sm font-bold tracking-[0.2em] text-muted-foreground/60"
+              >
+                {t}
+                <span className="ml-8 text-[oklch(0.82_0.22_165/0.4)]">◆</span>
+              </span>
+            ))}
           </div>
-        </Reveal>
+        </motion.div>
       </div>
+
+      <style>{`
+        @keyframes scroll {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
+      `}</style>
     </section>
-  )
+  );
 }

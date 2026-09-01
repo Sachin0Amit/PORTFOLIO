@@ -1,60 +1,61 @@
-import type { Metadata, Viewport } from "next";
-import { Unbounded, Space_Grotesk, JetBrains_Mono } from "next/font/google";
+import type { Metadata } from "next";
+import { Geist, Geist_Mono, Orbitron, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
-const display = Unbounded({
+const geistSans = Geist({
+  variable: "--font-geist-sans",
   subsets: ["latin"],
-  variable: "--font-unbounded",
 });
 
-const sans = Space_Grotesk({
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const orbitron = Orbitron({
+  variable: "--font-orbitron",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800", "900"],
+});
+
+const spaceGrotesk = Space_Grotesk({
   variable: "--font-space-grotesk",
-});
-
-const mono = JetBrains_Mono({
   subsets: ["latin"],
-  variable: "--font-jetbrains-mono",
+  weight: ["300", "400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "Sachin Kumar — Portfolio",
+  title: "Sachin Kumar // Cosmic Engineer Portfolio",
   description:
-    "Sachin Kumar — B.Tech Computer Science & Engineering student at Government Engineering College, Sheikhpura. Aspiring software engineer, learning German and Japanese.",
+    "Portfolio of Sachin Kumar — B.Tech CSE student at Government Engineering College, Sheikhpura. Aspiring software engineer exploring the cosmos of code, languages, and alien technologies.",
   keywords: [
     "Sachin Kumar",
     "Portfolio",
-    "Computer Science",
+    "Software Engineer",
     "B.Tech CSE",
     "Government Engineering College Sheikhpura",
-    "Software Engineer",
-    "Web Development",
+    "Bihar",
+    "Alien Theme",
     "Developer",
   ],
   authors: [{ name: "Sachin Kumar" }],
   icons: {
-    icon: "/logo.svg",
+    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
   },
   openGraph: {
-    title: "Sachin Kumar — Portfolio",
+    title: "Sachin Kumar // Cosmic Engineer",
     description:
-      "Portfolio of Sachin Kumar — B.Tech CSE student at Government Engineering College, Sheikhpura.",
+      "An alien-themed portfolio traversing the universe of code, learning, and ambition.",
     siteName: "Sachin Kumar Portfolio",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Sachin Kumar — Portfolio",
+    title: "Sachin Kumar // Cosmic Engineer",
     description:
-      "Portfolio of Sachin Kumar — B.Tech CSE student at Government Engineering College, Sheikhpura.",
+      "An alien-themed portfolio traversing the universe of code, learning, and ambition.",
   },
-};
-
-export const viewport: Viewport = {
-  themeColor: "#0a0614",
-  width: "device-width",
-  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -65,7 +66,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body
-        className={`${display.variable} ${sans.variable} ${mono.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} ${orbitron.variable} ${spaceGrotesk.variable} antialiased bg-background text-foreground`}
       >
         {children}
         <Toaster />
