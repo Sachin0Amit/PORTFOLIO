@@ -68,6 +68,12 @@ export interface GitHubStats {
   /** Sparse public contribution days for the trailing year (null = unavailable). */
   contributions: DayCount[] | null;
   totalContributions: number | null;
+  /**
+   * True when the GitHub REST API was rate-limited and stats were rebuilt
+   * from public profile HTML instead (repos/stars/languages/grid are real;
+   * follower counts are deferred). Auto-upgrades to full data on retry.
+   */
+  partial?: boolean;
 }
 
 export type PlatformStats =

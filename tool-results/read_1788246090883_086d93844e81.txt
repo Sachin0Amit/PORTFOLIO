@@ -1,0 +1,975 @@
+     1→     1→"use client";
+     2→     2→
+     3→     3→import { useCallback, useEffect, useMemo, useState } from "react";
+     4→     4→import { motion } from "framer-motion";
+     5→     5→import {
+     6→     6→  Code2,
+     7→     7→  Github,
+     8→     8→  Swords,
+     9→     9→  RefreshCw,
+    10→    10→  ExternalLink,
+    11→    11→  SatelliteDish,
+    12→    12→  AlertTriangle,
+    13→    13→  Radio,
+    14→    14→} from "lucide-react";
+    15→    15→import { SectionHeading } from "./SectionHeading";
+    16→    16→import type {
+    17→    17→  CodeforcesHistoryPoint,
+    18→    18→  CodeforcesStats,
+    19→    19→  DayCount,
+    20→    20→  GitHubStats,
+    21→    21→  LeetCodeStats,
+    22→    22→  PlatformResponse,
+    23→    23→} from "@/lib/platform-types";
+    24→    24→
+    25→    25→/* ================= platform visual config ================= */
+    26→    26→const PLATFORM_UI = {
+    27→    27→  leetcode: {
+    28→    28→    name: "LEETCODE",
+    29→    29→    icon: Code2,
+    30→    30→    channel: "CH·01",
+    31→    31→    text: "text-[oklch(0.75_0.22_90)]",
+    32→    32→    border: "border-[oklch(0.75_0.22_90/0.22)]",
+    33→    33→    bgIcon: "bg-[oklch(0.75_0.22_90/0.12)]",
+    34→    34→    edge: "via-[oklch(0.75_0.22_90/0.55)]",
+    35→    35→    ring: "oklch(0.75 0.22 90)",
+    36→    36→  },
+    37→    37→  codeforces: {
+    38→    38→    name: "CODEFORCES",
+    39→    39→    icon: Swords,
+    40→    40→    channel: "CH·02",
+    41→    41→    text: "text-[oklch(0.72_0.25_320)]",
+    42→    42→    border: "border-[oklch(0.72_0.25_320/0.25)]",
+    43→    43→    bgIcon: "bg-[oklch(0.72_0.25_320/0.12)]",
+    44→    44→    edge: "via-[oklch(0.72_0.25_320/0.55)]",
+    45→    45→    ring: "oklch(0.72 0.25 320)",
+    46→    46→  },
+    47→    47→  github: {
+    48→    48→    name: "GITHUB",
+    49→    49→    icon: Github,
+    50→    50→    channel: "CH·03",
+    51→    51→    text: "text-[oklch(0.78_0.20_195)]",
+    52→    52→    border: "border-[oklch(0.78_0.20_195/0.22)]",
+    53→    53→    bgIcon: "bg-[oklch(0.78_0.20_195/0.12)]",
+    54→    54→    edge: "via-[oklch(0.78_0.20_195/0.55)]",
+    55→    55→    ring: "oklch(0.78 0.20 195)",
+    56→    56→  },
+    57→    57→} as const;
+    58→    58→
+    59→    59→const ORDER = ["leetcode", "codeforces", "github"] as const;
+    60→    60→
+    61→    61→/* ================= Codeforces rank tier ================= */
+    62→    62→function cfTier(rank: string | null): { label: string; text: string } {
+    63→    63→  const r = (rank ?? "").toLowerCase();
+    64→    64→  if (r.includes("legendary"))
+    65→    65→    return { label: "LEGENDARY GM", text: "text-[oklch(0.72_0.25_320)]" };
+    66→    66→  if (r.includes("grandmaster"))
+    67→    67→    return { label: "GRANDMASTER", text: "text-[oklch(0.72_0.25_320/0.9)]" };
+    68→    68→  if (r.includes("master"))
+    69→    69→    return { label: r.replace(/\b\w/g, (c) => c.toUpperCase()), text: "text-[oklch(0.75_0.22_90)]" };
+    70→    70→  if (r.includes("expert"))
+    71→    71→    return { label: "EXPERT", text: "text-[oklch(0.78_0.20_195)]" };
+    72→    72→  if (r.includes("specialist"))
+    73→    73→    return { label: "SPECIALIST", text: "text-[oklch(0.78_0.20_195/0.85)]" };
+    74→    74→  if (r.includes("pupil"))
+    75→    75→    return { label: "PUPIL", text: "text-foreground/85" };
+    76→    76→  return { label: "NEWCOMER", text: "text-muted-foreground" };
+    77→    77→}
+    78→    78→
+    79→    79→/* ================= LeetCode ring geometry ================= */
+    80→    80→const LC_TOTAL_APPROX = 3600;
+    81→    81→const RING_R = 34;
+    82→    82→const RING_C = 2 * Math.PI * RING_R;
+    83→    83→
+    84→    84→/* ================= main component ================= */
+    85→    85→export function Platforms() {
+    86→    86→  const [data, setData] = useState<PlatformResponse[] | null>(null);
+    87→    87→  const [loading, setLoading] = useState(true);
+    88→    88→  const [refreshing, setRefreshing] = useState(false);
+    89→    89→  const [lastSync, setLastSync] = useState<Date | null>(null);
+    90→    90→
+    91→    91→  const load = useCallback(async (manual = false) => {
+    92→    92→    if (manual) setRefreshing(true);
+    93→    93→    try {
+    94→    94→      const res = await fetch("/api/platforms", { cache: "no-store" });
+    95→    95→      const json = (await res.json()) as {
+    96→    96→        ok: boolean;
+    97→    97→        platforms: PlatformResponse[];
+    98→    98→      };
+    99→    99→      if (json.ok) {
+   100→   100→        setData(json.platforms);
+   101→   101→        setLastSync(new Date());
+   102→   102→      }
+   103→   103→    } catch {
+   104→   104→      /* keep previous data on transient failure */
+   105→   105→    } finally {
+   106→   106→      setLoading(false);
+   107→   107→      if (manual) setRefreshing(false);
+   108→   108→    }
+   109→   109→  }, []);
+   110→   110→
+   111→   111→  useEffect(() => {
+   112→   112→    load();
+   113→   113→    const id = setInterval(() => load(), 10 * 60 * 1000);
+   114→   114→    return () => clearInterval(id);
+   115→   115→  }, [load]);
+   116→   116→
+   117→   117→  const byPlatform = new Map((data ?? []).map((p) => [p.platform, p]));
+   118→   118→  const degradedCount = (data ?? []).filter(
+   119→   119→    (p) => p.status === "degraded" || p.status === "disabled"
+   120→   120→  ).length;
+   121→   121→  const connectedCount = (data ?? []).filter((p) => p.connected).length;
+   122→   122→  const syncTime = lastSync
+   123→   123→    ? lastSync.toLocaleTimeString("en-GB", { hour12: false })
+   124→   124→    : "--:--:--";
+   125→   125→
+   126→   126→  return (
+   127→   127→    <section id="platforms" className="relative px-4 py-20 sm:py-28">
+   128→   128→      {/* Ambient glow */}
+   129→   129→      <div className="pointer-events-none absolute right-1/4 top-16 h-64 w-72 rounded-full bg-[oklch(0.78_0.20_195/0.05)] blur-3xl" />
+   130→   130→
+   131→   131→      <div className="mx-auto max-w-5xl">
+   132→   132→        <SectionHeading
+   133→   133→          index="07 // UPLINK"
+   134→   134→          title="CODING UPLINK"
+   135→   135→          subtitle="Live signals from LeetCode, Codeforces and GitHub — synced straight from each platform's public API."
+   136→   136→          accent="cyan"
+   137→   137→        />
+   138→   138→
+   139→   139→        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+   140→   140→          {ORDER.map((id, i) => (
+   141→   141→            <PlatformCard
+   142→   142→              key={id}
+   143→   143→              index={i}
+   144→   144→              data={byPlatform.get(id) ?? null}
+   145→   145→              loading={loading}
+   146→   146→            />
+   147→   147→          ))}
+   148→   148→        </div>
+   149→   149→
+   150→   150→        {/* Sync strip */}
+   151→   151→        <motion.div
+   152→   152→          initial={{ opacity: 0, y: 16 }}
+   153→   153→          whileInView={{ opacity: 1, y: 0 }}
+   154→   154→          viewport={{ once: true }}
+   155→   155→          transition={{ duration: 0.5, delay: 0.2 }}
+   156→   156→          className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[oklch(0.82_0.22_165/0.15)] bg-[oklch(0.09_0.02_280/85)] px-4 py-2.5 backdrop-blur-md"
+   157→   157→        >
+   158→   158→          <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.2em] text-muted-foreground">
+   159→   159→            <Radio className="h-3 w-3 text-[oklch(0.82_0.22_165)]" />
+   160→   160→            <span>
+   161→   161→              UPLINKS {connectedCount}/3 ACTIVE · LAST SYNC {syncTime} · AUTO 10M
+   162→   162→            </span>
+   163→   163→            {degradedCount > 0 && (
+   164→   164→              <span className="text-[oklch(0.75_0.22_90)]">
+   165→   165→                · {degradedCount} CHANNEL{degradedCount > 1 ? "S" : ""} DEGRADED
+   166→   166→              </span>
+   167→   167→            )}
+   168→   168→          </div>
+   169→   169→          <button
+   170→   170→            onClick={() => load(true)}
+   171→   171→            disabled={refreshing}
+   172→   172→            className="flex items-center gap-1.5 rounded-lg border border-[oklch(0.82_0.22_165/0.3)] bg-[oklch(0.10_0.02_280/0.6)] px-2.5 py-1.5 font-mono text-[9px] tracking-[0.2em] text-[oklch(0.82_0.22_165)] transition-all hover:border-[oklch(0.82_0.22_165/0.6)] hover:bg-[oklch(0.82_0.22_165/0.1)] disabled:opacity-50"
+   173→   173→            aria-label="Refresh platform stats"
+   174→   174→          >
+   175→   175→            <RefreshCw
+   176→   176→              className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`}
+   177→   177→            />
+   178→   178→            RESYNC
+   179→   179→          </button>
+   180→   180→        </motion.div>
+   181→   181→      </div>
+   182→   182→    </section>
+   183→   183→  );
+   184→   184→}
+   185→   185→
+   186→   186→/* ================= card shell ================= */
+   187→   187→function PlatformCard({
+   188→   188→  index,
+   189→   189→  data,
+   190→   190→  loading,
+   191→   191→}: {
+   192→   192→  index: number;
+   193→   193→  data: PlatformResponse | null;
+   194→   194→  loading: boolean;
+   195→   195→}) {
+   196→   196→  const id = data?.platform ?? ORDER[index];
+   197→   197→  const ui = PLATFORM_UI[id];
+   198→   198→  const status = data?.status ?? "standby";
+   199→   199→
+   200→   200→  return (
+   201→   201→    <motion.div
+   202→   202→      initial={{ opacity: 0, y: 28 }}
+   203→   203→      whileInView={{ opacity: 1, y: 0 }}
+   204→   204→      viewport={{ once: true, margin: "-60px" }}
+   205→   205→      transition={{ duration: 0.55, delay: index * 0.1 }}
+   206→   206→      className={`relative flex flex-col overflow-hidden rounded-2xl border ${ui.border} bg-[oklch(0.09_0.02_280/85)] shadow-[0_0_40px_oklch(0.09_0.02_280/0.8)] backdrop-blur-md`}
+   207→   207→    >
+   208→   208→      {/* texture + top edge */}
+   209→   209→      <div aria-hidden className="scanlines pointer-events-none absolute inset-0 opacity-50" />
+   210→   210→      <div
+   211→   211→        aria-hidden
+   212→   212→        className={`pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent ${ui.edge} to-transparent`}
+   213→   213→      />
+   214→   214→
+   215→   215→      {/* header strip */}
+   216→   216→      <div className="relative flex items-center gap-2.5 border-b border-white/5 bg-[oklch(0.13_0.04_280/60)] px-4 py-2.5">
+   217→   217→        <span className={`flex h-6 w-6 items-center justify-center rounded-md ${ui.bgIcon}`}>
+   218→   218→          <ui.icon className={`h-3.5 w-3.5 ${ui.text}`} />
+   219→   219→        </span>
+   220→   220→        <span className="font-mono text-[10px] tracking-[0.22em] text-foreground/80">
+   221→   221→          {ui.name}
+   222→   222→        </span>
+   223→   223→        <span className="ml-auto font-mono text-[8px] tracking-[0.2em] text-muted-foreground/50">
+   224→   224→          {ui.channel}
+   225→   225→        </span>
+   226→   226→        <StatusBadge status={status} />
+   227→   227→      </div>
+   228→   228→
+   229→   229→      {/* body */}
+   230→   230→      <div className="relative flex flex-1 flex-col p-5">
+   231→   231→        {loading && <CardSkeleton />}
+   232→   232→        {!loading && data?.status === "standby" && <StandbyBody />}
+   233→   233→        {!loading && data?.status === "degraded" && (
+   234→   234→          <DegradedBody error={data.error} />
+   235→   235→        )}
+   236→   236→        {!loading && data?.status === "live" && data.stats && (
+   237→   237→          <LiveBody platform={id} stats={data.stats} />
+   238→   238→        )}
+   239→   239→        {!loading && !data && <StandbyBody />}
+   240→   240→      </div>
+   241→   241→
+   242→   242→      {/* footer */}
+   243→   243→      <div className="relative flex items-center justify-between gap-3 border-t border-white/5 px-4 py-2.5">
+   244→   244→        <span className="flex min-w-0 items-center gap-2 font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
+   245→   245→          {data?.stats &&
+   246→   246→            "avatarUrl" in data.stats &&
+   247→   247→            data.stats.avatarUrl && (
+   248→   248→              <img
+   249→   249→                src={data.stats.avatarUrl}
+   250→   250→                alt={`${data.label} avatar`}
+   251→   251→                className="h-4 w-4 shrink-0 rounded-full border border-white/20 object-cover"
+   252→   252→              />
+   253→   253→            )}
+   254→   254→          <span className="truncate">
+   255→   255→            {data?.handle ? `@${data.handle}` : "NO HANDLE LINKED"}
+   256→   256→          </span>
+   257→   257→        </span>
+   258→   258→        {data?.profileUrl ? (
+   259→   259→          <a
+   260→   260→            href={data.profileUrl}
+   261→   261→            target="_blank"
+   262→   262→            rel="noopener noreferrer"
+   263→   263→            className={`flex shrink-0 items-center gap-1 font-mono text-[9px] tracking-[0.2em] ${ui.text} transition-opacity hover:opacity-70`}
+   264→   264→          >
+   265→   265→            VIEW PROFILE
+   266→   266→            <ExternalLink className="h-3 w-3" />
+   267→   267→          </a>
+   268→   268→        ) : (
+   269→   269→          <span className="font-mono text-[9px] tracking-[0.2em] text-muted-foreground/40">
+   270→   270→            OFFLINE
+   271→   271→          </span>
+   272→   272→        )}
+   273→   273→      </div>
+   274→   274→    </motion.div>
+   275→   275→  );
+   276→   276→}
+   277→   277→
+   278→   278→/* ================= status badge ================= */
+   279→   279→function StatusBadge({ status }: { status: string }) {
+   280→   280→  if (status === "live") {
+   281→   281→    return (
+   282→   282→      <span className="flex items-center gap-1.5 rounded-full border border-[oklch(0.82_0.22_165/0.35)] bg-[oklch(0.82_0.22_165/0.08)] px-2 py-0.5 font-mono text-[8px] tracking-[0.22em] text-[oklch(0.82_0.22_165)]">
+   283→   283→        <span className="relative flex h-1.5 w-1.5">
+   284→   284→          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[oklch(0.82_0.22_165/0.8)]" />
+   285→   285→          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[oklch(0.82_0.22_165)]" />
+   286→   286→        </span>
+   287→   287→        LIVE
+   288→   288→      </span>
+   289→   289→    );
+   290→   290→  }
+   291→   291→  if (status === "degraded") {
+   292→   292→    return (
+   293→   293→      <span className="flex items-center gap-1.5 rounded-full border border-[oklch(0.72_0.25_320/0.4)] bg-[oklch(0.72_0.25_320/0.1)] px-2 py-0.5 font-mono text-[8px] tracking-[0.22em] text-[oklch(0.72_0.25_320)]">
+   294→   294→        <AlertTriangle className="h-2.5 w-2.5" />
+   295→   295→        SIGNAL LOST
+   296→   296→      </span>
+   297→   297→    );
+   298→   298→  }
+   299→   299→  return (
+   300→   300→    <span className="flex items-center gap-1.5 rounded-full border border-[oklch(0.75_0.22_90/0.35)] bg-[oklch(0.75_0.22_90/0.08)] px-2 py-0.5 font-mono text-[8px] tracking-[0.22em] text-[oklch(0.75_0.22_90)]">
+   301→   301→      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[oklch(0.75_0.22_90)]" />
+   302→   302→      STANDBY
+   303→   303→    </span>
+   304→   304→  );
+   305→   305→}
+   306→   306→
+   307→   307→/* ================= body states ================= */
+   308→   308→function CardSkeleton() {
+   309→   309→  return (
+   310→   310→    <div className="flex flex-col gap-3 py-2" aria-hidden>
+   311→   311→      <div className="h-10 w-2/3 animate-pulse rounded-lg bg-white/5" />
+   312→   312→      <div className="h-3 w-full animate-pulse rounded bg-white/5" />
+   313→   313→      <div className="h-3 w-4/5 animate-pulse rounded bg-white/5" />
+   314→   314→      <div className="mt-3 grid grid-cols-3 gap-2">
+   315→   315→        {[0, 1, 2].map((i) => (
+   316→   316→          <div
+   317→   317→            key={i}
+   318→   318→            className="h-12 animate-pulse rounded-lg bg-white/5"
+   319→   319→            style={{ animationDelay: `${i * 0.15}s` }}
+   320→   320→          />
+   321→   321→        ))}
+   322→   322→      </div>
+   323→   323→    </div>
+   324→   324→  );
+   325→   325→}
+   326→   326→
+   327→   327→function StandbyBody() {
+   328→   328→  return (
+   329→   329→    <div className="flex flex-1 flex-col items-center justify-center gap-3 py-6 text-center">
+   330→   330→      <div className="relative flex h-16 w-16 items-center justify-center rounded-full border border-dashed border-[oklch(0.75_0.22_90/0.4)]">
+   331→   331→        <span className="absolute inset-0 animate-ping rounded-full border border-[oklch(0.75_0.22_90/0.15)]" />
+   332→   332→        <SatelliteDish className="h-6 w-6 animate-pulse text-[oklch(0.75_0.22_90)]" />
+   333→   333→      </div>
+   334→   334→      <div className="font-display text-sm font-bold tracking-[0.15em] text-[oklch(0.75_0.22_90)]">
+   335→   335→        AWAITING UPLINK
+   336→   336→      </div>
+   337→   337→      <p className="max-w-[220px] font-mono text-[9px] leading-relaxed tracking-[0.1em] text-muted-foreground">
+   338→   338→        PROFILE LINK NOT CONFIGURED — TRANSMIT YOUR HANDLE TO ACTIVATE THIS
+   339→   339→        FEED
+   340→   340→      </p>
+   341→   341→    </div>
+   342→   342→  );
+   343→   343→}
+   344→   344→
+   345→   345→function DegradedBody({ error }: { error: string | null }) {
+   346→   346→  return (
+   347→   347→    <div className="flex flex-1 flex-col items-center justify-center gap-2 py-6 text-center">
+   348→   348→      <AlertTriangle className="h-7 w-7 text-[oklch(0.72_0.25_320)]" />
+   349→   349→      <div className="font-display text-sm font-bold tracking-[0.15em] text-[oklch(0.72_0.25_320)]">
+   350→   350→        SIGNAL LOST
+   351→   351→      </div>
+   352→   352→      <p className="font-mono text-[9px] tracking-[0.12em] text-muted-foreground">
+   353→   353→        {error ?? "UPSTREAM UNAVAILABLE"} — AUTO-RETRY ACTIVE
+   354→   354→      </p>
+   355→   355→    </div>
+   356→   356→  );
+   357→   357→}
+   358→   358→
+   359→   359→function LiveBody({
+   360→   360→  platform,
+   361→   361→  stats,
+   362→   362→}: {
+   363→   363→  platform: (typeof ORDER)[number];
+   364→   364→  stats: LeetCodeStats | CodeforcesStats | GitHubStats;
+   365→   365→}) {
+   366→   366→  if (platform === "leetcode") {
+   367→   367→    return <LeetCodeBody stats={stats as LeetCodeStats} />;
+   368→   368→  }
+   369→   369→  if (platform === "codeforces") {
+   370→   370→    return <CodeforcesBody stats={stats as CodeforcesStats} />;
+   371→   371→  }
+   372→   372→  return <GitHubBody stats={stats as GitHubStats} />;
+   373→   373→}
+   374→   374→
+   375→   375→/* ================= activity heatmap (shared) ================= */
+   376→   376→
+   377→   377→const HEAT_WEEKS = 52;
+   378→   378→const HEAT_CELL = 4; // px
+   379→   379→const HEAT_GAP = 1; // px
+   380→   380→const HEAT_STEP = HEAT_CELL + HEAT_GAP;
+   381→   381→
+   382→   382→/** Per-platform intensity palettes (level 0 → 4). */
+   383→   383→const HEAT_PALETTES = {
+   384→   384→  amber: [
+   385→   385→    "bg-white/[0.05]",
+   386→   386→    "bg-[oklch(0.75_0.22_90/0.3)]",
+   387→   387→    "bg-[oklch(0.75_0.22_90/0.5)]",
+   388→   388→    "bg-[oklch(0.75_0.22_90/0.75)]",
+   389→   389→    "bg-[oklch(0.75_0.22_90)] shadow-[0_0_5px_oklch(0.75_0.22_90/0.5)]",
+   390→   390→  ],
+   391→   391→  cyan: [
+   392→   392→    "bg-white/[0.05]",
+   393→   393→    "bg-[oklch(0.78_0.20_195/0.3)]",
+   394→   394→    "bg-[oklch(0.78_0.20_195/0.5)]",
+   395→   395→    "bg-[oklch(0.78_0.20_195/0.75)]",
+   396→   396→    "bg-[oklch(0.78_0.20_195)] shadow-[0_0_5px_oklch(0.78_0.20_195/0.5)]",
+   397→   397→  ],
+   398→   398→} as const;
+   399→   399→
+   400→   400→type HeatPalette = keyof typeof HEAT_PALETTES;
+   401→   401→
+   402→   402→interface HeatWeek {
+   403→   403→  cells: { date: string; count: number; future: boolean }[];
+   404→   404→  monthLabel: string | null;
+   405→   405→}
+   406→   406→
+   407→   407→function dateKey(d: Date): string {
+   408→   408→  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+   409→   409→    d.getDate()
+   410→   410→  ).padStart(2, "0")}`;
+   411→   411→}
+   412→   412→
+   413→   413→/** Build the trailing 52-week grid (Sun-first columns, last col = current week). */
+   414→   414→function buildHeatWeeks(days: DayCount[]): HeatWeek[] {
+   415→   415→  const map = new Map(days.map((d) => [d.date, d.count]));
+   416→   416→  const today = new Date();
+   417→   417→  today.setHours(12, 0, 0, 0);
+   418→   418→  const lastSunday = new Date(today);
+   419→   419→  lastSunday.setDate(today.getDate() - today.getDay());
+   420→   420→
+   421→   421→  const weeks: HeatWeek[] = [];
+   422→   422→  let prevMonth = -1;
+   423→   423→  for (let w = HEAT_WEEKS - 1; w >= 0; w--) {
+   424→   424→    const weekStart = new Date(lastSunday);
+   425→   425→    weekStart.setDate(lastSunday.getDate() - w * 7);
+   426→   426→    const cells: { date: string; count: number; future: boolean }[] = [];
+   427→   427→    for (let dow = 0; dow < 7; dow++) {
+   428→   428→      const dt = new Date(weekStart);
+   429→   429→      dt.setDate(weekStart.getDate() + dow);
+   430→   430→      const future = dt > today;
+   431→   431→      cells.push({
+   432→   432→        date: future ? "" : dateKey(dt),
+   433→   433→        count: future ? 0 : (map.get(dateKey(dt)) ?? 0),
+   434→   434→        future,
+   435→   435→      });
+   436→   436→    }
+   437→   437→    const m = weekStart.getMonth();
+   438→   438→    const monthLabel = m !== prevMonth ? weekStart.toLocaleDateString("en", { month: "short" }) : null;
+   439→   439→    if (m !== prevMonth) prevMonth = m;
+   440→   440→    weeks.push({ cells, monthLabel });
+   441→   441→  }
+   442→   442→  return weeks;
+   443→   443→}
+   444→   444→
+   445→   445→function heatLevel(count: number, thresholds: number[]): number {
+   446→   446→  if (count <= 0) return 0;
+   447→   447→  if (count >= thresholds[2]) return 4;
+   448→   448→  if (count >= thresholds[1]) return 3;
+   449→   449→  if (count >= thresholds[0]) return 2;
+   450→   450→  return 1;
+   451→   451→}
+   452→   452→
+   453→   453→function MiniHeatmap({
+   454→   454→  days,
+   455→   455→  thresholds,
+   456→   456→  unit,
+   457→   457→  palette,
+   458→   458→}: {
+   459→   459→  days: DayCount[];
+   460→   460→  thresholds: number[];
+   461→   461→  unit: string;
+   462→   462→  palette: HeatPalette;
+   463→   463→}) {
+   464→   464→  const weeks = useMemo(() => buildHeatWeeks(days), [days]);
+   465→   465→  const activeTotal = days.reduce((s, d) => s + d.count, 0);
+   466→   466→  const levels = HEAT_PALETTES[palette];
+   467→   467→
+   468→   468→  return (
+   469→   469→    <div>
+   470→   470→      <div className="w-fit">
+   471→   471→        {/* month labels */}
+   472→   472→        <div className="relative mb-1 h-[8px]" aria-hidden>
+   473→   473→          {weeks.map((wk, wi) =>
+   474→   474→            wk.monthLabel ? (
+   475→   475→              <span
+   476→   476→                key={wk.cells[0].date || wi}
+   477→   477→                className="absolute font-mono text-[7px] leading-none text-muted-foreground/60"
+   478→   478→                style={{ left: `${wi * HEAT_STEP}px` }}
+   479→   479→              >
+   480→   480→                {wk.monthLabel}
+   481→   481→              </span>
+   482→   482→            ) : null
+   483→   483→          )}
+   484→   484→        </div>
+   485→   485→        {/* grid */}
+   486→   486→        <div className="flex" style={{ gap: `${HEAT_GAP}px` }}>
+   487→   487→          {weeks.map((wk, wi) => (
+   488→   488→            <div key={wk.cells[0].date || `w-${wi}`} className="flex flex-col" style={{ gap: `${HEAT_GAP}px` }}>
+   489→   489→              {wk.cells.map((c, di) => (
+   490→   490→                <span
+   491→   491→                  key={c.date || `f-${wi}-${di}`}
+   492→   492→                  title={
+   493→   493→                    c.future || c.date === ""
+   494→   494→                      ? undefined
+   495→   495→                      : c.count > 0
+   496→   496→                        ? `${c.count} ${unit} · ${c.date}`
+   497→   497→                        : `0 ${unit} · ${c.date}`
+   498→   498→                  }
+   499→   499→                  className={`h-[4px] w-[4px] rounded-[1px] ${
+   500→   500→                    c.future ? "bg-transparent" : levels[heatLevel(c.count, thresholds)]
+   501→   501→                  }`}
+   502→   502→                />
+   503→   503→              ))}
+   504→   504→            </div>
+   505→   505→          ))}
+   506→   506→        </div>
+   507→   507→      </div>
+   508→   508→      {/* legend */}
+   509→   509→      <div className="mt-2 flex items-center justify-between font-mono text-[7px] tracking-[0.15em] text-muted-foreground/70">
+   510→   510→        <span>
+   511→   511→          {activeTotal.toLocaleString()} {unit} · 52W
+   512→   512→        </span>
+   513→   513→        <span className="flex items-center gap-1">
+   514→   514→          LESS
+   515→   515→          {levels.map((cls, i) => (
+   516→   516→            <span key={i} className={`h-[4px] w-[4px] rounded-[1px] ${cls}`} />
+   517→   517→          ))}
+   518→   518→          MORE
+   519→   519→        </span>
+   520→   520→      </div>
+   521→   521→      <span className="sr-only">
+   522→   522→        Activity heatmap: {activeTotal} {unit} over the last 52 weeks.
+   523→   523→      </span>
+   524→   524→    </div>
+   525→   525→  );
+   526→   526→}
+   527→   527→
+   528→   528→/* ================= LeetCode ================= */
+   529→   529→
+   530→   530→/** LeetCode stores 5000001 as the "unranked" sentinel for new profiles. */
+   531→   531→const LC_UNRANKED_SENTINEL = 5000000;
+   532→   532→
+   533→   533→function relTime(iso: string): string {
+   534→   534→  const t = new Date(iso).getTime();
+   535→   535→  if (Number.isNaN(t)) return "—";
+   536→   536→  const diff = Math.max(0, Date.now() - t);
+   537→   537→  const m = Math.floor(diff / 60000);
+   538→   538→  if (m < 1) return "now";
+   539→   539→  if (m < 60) return `${m}m`;
+   540→   540→  const h = Math.floor(m / 60);
+   541→   541→  if (h < 24) return `${h}h`;
+   542→   542→  const d = Math.floor(h / 24);
+   543→   543→  if (d < 30) return `${d}d`;
+   544→   544→  return `${Math.floor(d / 30)}mo`;
+   545→   545→}
+   546→   546→
+   547→   547→function LeetCodeBody({ stats }: { stats: LeetCodeStats }) {
+   548→   548→  const pct = Math.min(1, stats.totalSolved / LC_TOTAL_APPROX);
+   549→   549→  const ranked = stats.ranking != null && stats.ranking < LC_UNRANKED_SENTINEL;
+   550→   550→  const bars = [
+   551→   551→    { label: "EASY", count: stats.easy, cls: "bg-[oklch(0.82_0.22_165)]", text: "text-[oklch(0.82_0.22_165)]" },
+   552→   552→    { label: "MEDIUM", count: stats.medium, cls: "bg-[oklch(0.75_0.22_90)]", text: "text-[oklch(0.75_0.22_90)]" },
+   553→   553→    { label: "HARD", count: stats.hard, cls: "bg-[oklch(0.72_0.25_320)]", text: "text-[oklch(0.72_0.25_320)]" },
+   554→   554→  ];
+   555→   555→  const maxCount = Math.max(1, stats.easy, stats.medium, stats.hard);
+   556→   556→
+   557→   557→  return (
+   558→   558→    <div className="flex flex-1 flex-col gap-5">
+   559→   559→      {/* ring + big number */}
+   560→   560→      <div className="flex items-center gap-5">
+   561→   561→        <div className="relative h-24 w-24 shrink-0">
+   562→   562→          <svg viewBox="0 0 80 80" className="h-full w-full -rotate-90">
+   563→   563→            <circle
+   564→   564→              cx="40"
+   565→   565→              cy="40"
+   566→   566→              r={RING_R}
+   567→   567→              fill="none"
+   568→   568→              stroke="oklch(0.17 0.04 280)"
+   569→   569→              strokeWidth="7"
+   570→   570→            />
+   571→   571→            <motion.circle
+   572→   572→              cx="40"
+   573→   573→              cy="40"
+   574→   574→              r={RING_R}
+   575→   575→              fill="none"
+   576→   576→              stroke={PLATFORM_UI.leetcode.ring}
+   577→   577→              strokeWidth="7"
+   578→   578→              strokeLinecap="round"
+   579→   579→              strokeDasharray={RING_C}
+   580→   580→              initial={{ strokeDashoffset: RING_C }}
+   581→   581→              animate={{ strokeDashoffset: RING_C * (1 - pct) }}
+   582→   582→              transition={{ duration: 1.2, ease: [0.22, 1, 0.36, 1] }}
+   583→   583→              style={{ transformOrigin: "40px 40px" }}
+   584→   584→            />
+   585→   585→          </svg>
+   586→   586→          <div className="absolute inset-0 flex flex-col items-center justify-center">
+   587→   587→            <span className="font-display text-2xl font-black leading-none text-foreground">
+   588→   588→              {stats.totalSolved}
+   589→   589→            </span>
+   590→   590→            <span className="mt-0.5 font-mono text-[7px] tracking-[0.2em] text-muted-foreground">
+   591→   591→              SOLVED
+   592→   592→            </span>
+   593→   593→          </div>
+   594→   594→        </div>
+   595→   595→        <div className="flex-1 space-y-2.5">
+   596→   596→          {bars.map((b) => (
+   597→   597→            <div key={b.label}>
+   598→   598→              <div className="mb-1 flex items-center justify-between font-mono text-[8px] tracking-[0.18em]">
+   599→   599→                <span className={b.text}>{b.label}</span>
+   600→   600→                <span className="text-muted-foreground">{b.count}</span>
+   601→   601→              </div>
+   602→   602→              <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+   603→   603→                <motion.div
+   604→   604→                  initial={{ width: 0 }}
+   605→   605→                  animate={{ width: `${(b.count / maxCount) * 100}%` }}
+   606→   606→                  transition={{ duration: 0.9, delay: 0.25 }}
+   607→   607→                  className={`h-full rounded-full ${b.cls}`}
+   608→   608→                />
+   609→   609→              </div>
+   610→   610→            </div>
+   611→   611→          ))}
+   612→   612→        </div>
+   613→   613→      </div>
+   614→   614→
+   615→   615→      {/* meta row */}
+   616→   616→      <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-white/5 pt-3 font-mono text-[8px] tracking-[0.15em] text-muted-foreground">
+   617→   617→        <span>
+   618→   618→          GLOBAL RANK{" "}
+   619→   619→          {ranked ? (
+   620→   620→            <span className="text-[oklch(0.75_0.22_90)]">
+   621→   621→              #{stats.ranking?.toLocaleString()}
+   622→   622→            </span>
+   623→   623→          ) : (
+   624→   624→            <span className="text-muted-foreground/60">PENDING</span>
+   625→   625→          )}
+   626→   626→        </span>
+   627→   627→        {stats.contestRating != null ? (
+   628→   628→          <span>
+   629→   629→            CONTEST <span className="text-[oklch(0.75_0.22_90)]">{stats.contestRating}</span>
+   630→   630→          </span>
+   631→   631→        ) : (
+   632→   632→          <span>
+   633→   633→            CONTESTS{" "}
+   634→   634→            <span className="text-muted-foreground/60">
+   635→   635→              {stats.contestsAttended ?? 0}
+   636→   636→            </span>
+   637→   637→          </span>
+   638→   638→        )}
+   639→   639→      </div>
+   640→   640→
+   641→   641→      {/* solving grid */}
+   642→   642→      <div className="border-t border-white/5 pt-3">
+   643→   643→        <div className="mb-1.5 flex items-center justify-between font-mono text-[8px] tracking-[0.2em] text-muted-foreground">
+   644→   644→          <span>SOLVING GRID · 52W</span>
+   645→   645→          <span>
+   646→   646→            STREAK <span className="text-[oklch(0.75_0.22_90)]">{stats.streak ?? 0}d</span>
+   647→   647→            {" · "}ACTIVE{" "}
+   648→   648→            <span className="text-[oklch(0.75_0.22_90)]">{stats.totalActiveDays ?? 0}d</span>
+   649→   649→          </span>
+   650→   650→        </div>
+   651→   651→        <MiniHeatmap
+   652→   652→          days={stats.submissionDays}
+   653→   653→          thresholds={[1, 3, 5, 8]}
+   654→   654→          unit="solves"
+   655→   655→          palette="amber"
+   656→   656→        />
+   657→   657→      </div>
+   658→   658→
+   659→   659→      {/* skill signals */}
+   660→   660→      {stats.skillTags.length > 0 && (
+   661→   661→        <div className="border-t border-white/5 pt-3">
+   662→   662→          <div className="mb-1.5 font-mono text-[8px] tracking-[0.2em] text-muted-foreground">
+   663→   663→            SKILL SIGNALS
+   664→   664→          </div>
+   665→   665→          <div className="flex flex-wrap gap-1.5">
+   666→   666→            {stats.skillTags.map((tag) => (
+   667→   667→              <span
+   668→   668→                key={tag}
+   669→   669→                className="rounded-full border border-[oklch(0.82_0.22_165/0.3)] bg-[oklch(0.82_0.22_165/0.08)] px-2.5 py-0.5 font-mono text-[8px] tracking-[0.1em] text-[oklch(0.82_0.22_165)]"
+   670→   670→              >
+   671→   671→                {tag}
+   672→   672→              </span>
+   673→   673→            ))}
+   674→   674→          </div>
+   675→   675→        </div>
+   676→   676→      )}
+   677→   677→
+   678→   678→      {/* recent solves feed */}
+   679→   679→      {stats.recentSolves.length > 0 && (
+   680→   680→        <div className="border-t border-white/5 pt-3">
+   681→   681→          <div className="mb-1.5 flex items-center gap-1.5 font-mono text-[8px] tracking-[0.2em] text-muted-foreground">
+   682→   682→            <span className="h-1 w-1 animate-pulse rounded-full bg-[oklch(0.82_0.22_165)]" />
+   683→   683→            RECENT SOLVES
+   684→   684→          </div>
+   685→   685→          <ul className="space-y-1">
+   686→   686→            {stats.recentSolves.map((solve) => (
+   687→   687→              <li key={solve.titleSlug}>
+   688→   688→                <a
+   689→   689→                  href={`https://leetcode.com/problems/${solve.titleSlug}/`}
+   690→   690→                  target="_blank"
+   691→   691→                  rel="noopener noreferrer"
+   692→   692→                  className="group flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-white/[0.03]"
+   693→   693→                >
+   694→   694→                  <span
+   695→   695→                    aria-hidden
+   696→   696→                    className="font-mono text-[8px] text-[oklch(0.82_0.22_165)]"
+   697→   697→                  >
+   698→   698→                    ▸
+   699→   699→                  </span>
+   700→   700→                  <span className="min-w-0 flex-1 truncate font-mono text-[9px] tracking-[0.08em] text-foreground/75 transition-colors group-hover:text-foreground">
+   701→   701→                    {solve.title}
+   702→   702→                  </span>
+   703→   703→                  <span className="shrink-0 font-mono text-[8px] text-muted-foreground/60">
+   704→   704→                    {relTime(solve.timestamp)}
+   705→   705→                  </span>
+   706→   706→                </a>
+   707→   707→              </li>
+   708→   708→            ))}
+   709→   709→          </ul>
+   710→   710→        </div>
+   711→   711→      )}
+   712→   712→    </div>
+   713→   713→  );
+   714→   714→}
+   715→   715→
+   716→   716→/* ================= Codeforces ================= */
+   717→   717→
+   718→   718→/** SVG rating-trajectory chart (client-rendered from fetched data). */
+   719→   719→function RatingTrajectory({ history }: { history: CodeforcesHistoryPoint[] }) {
+   720→   720→  if (history.length === 0) {
+   721→   721→    return (
+   722→   722→      <div className="flex h-[64px] items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.02] font-mono text-[8px] tracking-[0.18em] text-muted-foreground/60">
+   723→   723→        NO CONTESTS LOGGED — TRAJECTORY ARMED
+   724→   724→      </div>
+   725→   725→    );
+   726→   726→  }
+   727→   727→
+   728→   728→  const W = 320;
+   729→   729→  const H = 88;
+   730→   730→  const PX = 10;
+   731→   731→  const TOP = 12;
+   732→   732→  const BOT = 78;
+   733→   733→  const n = history.length;
+   734→   734→  const ratings = history.map((h) => h.rating);
+   735→   735→  let min = Math.min(...ratings);
+   736→   736→  let max = Math.max(...ratings);
+   737→   737→  if (min === max) {
+   738→   738→    min -= 50;
+   739→   739→    max += 50;
+   740→   740→  } else {
+   741→   741→    const pad = (max - min) * 0.08;
+   742→   742→    min -= pad;
+   743→   743→    max += pad;
+   744→   744→  }
+   745→   745→
+   746→   746→  const x = (i: number) => (n === 1 ? W / 2 : PX + (i / (n - 1)) * (W - 2 * PX));
+   747→   747→  const y = (r: number) => BOT - ((r - min) / (max - min)) * (BOT - TOP);
+   748→   748→
+   749→   749→  const r2 = (v: number) => v.toFixed(2);
+   750→   750→  const line = history
+   751→   751→    .map((h, i) => `${i === 0 ? "M" : "L"}${r2(x(i))},${r2(y(h.rating))}`)
+   752→   752→    .join(" ");
+   753→   753→  const area = `${line} L${r2(x(n - 1))},${BOT} L${r2(x(0))},${BOT} Z`;
+   754→   754→  const peakIdx = ratings.indexOf(Math.max(...ratings));
+   755→   755→  const lastIdx = n - 1;
+   756→   756→  // Label side depends on peak position so text never clips the viewBox.
+   757→   757→  const peakLeft = x(peakIdx) < W / 2;
+   758→   758→  const peakTextX = peakLeft ? x(peakIdx) + 6 : x(peakIdx) - 6;
+   759→   759→
+   760→   760→  return (
+   761→   761→    <svg
+   762→   762→      viewBox={`0 0 ${W} ${H}`}
+   763→   763→      className="h-auto w-full"
+   764→   764→      role="img"
+   765→   765→      aria-label={`Codeforces rating history across ${n} contests`}
+   766→   766→    >
+   767→   767→      <defs>
+   768→   768→        <linearGradient id="cfAreaGrad" x1="0" y1="0" x2="0" y2="1">
+   769→   769→          <stop offset="0%" stopColor="oklch(0.78 0.20 195)" stopOpacity="0.3" />
+   770→   770→          <stop offset="100%" stopColor="oklch(0.72 0.25 320)" stopOpacity="0.02" />
+   771→   771→        </linearGradient>
+   772→   772→      </defs>
+   773→   773→      {/* baseline */}
+   774→   774→      <line
+   775→   775→        x1={PX}
+   776→   776→        y1={BOT}
+   777→   777→        x2={W - PX}
+   778→   778→        y2={BOT}
+   779→   779→        stroke="oklch(1 0 0 / 0.08)"
+   780→   780→        strokeWidth="1"
+   781→   781→      />
+   782→   782→      <path d={area} fill="url(#cfAreaGrad)" />
+   783→   783→      <motion.path
+   784→   784→        d={line}
+   785→   785→        fill="none"
+   786→   786→        stroke="oklch(0.82 0.22 165)"
+   787→   787→        strokeWidth="1.5"
+   788→   788→        strokeLinejoin="round"
+   789→   789→        strokeLinecap="round"
+   790→   790→        initial={{ pathLength: 0 }}
+   791→   791→        animate={{ pathLength: 1 }}
+   792→   792→        transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
+   793→   793→      />
+   794→   794→      {/* data points (with tooltips when sparse) */}
+   795→   795→      {history.map((h, i) =>
+   796→   796→        n <= 24 || i === peakIdx || i === lastIdx ? (
+   797→   797→          <circle
+   798→   798→            key={i}
+   799→   799→            cx={r2(x(i))}
+   800→   800→            cy={r2(y(h.rating))}
+   801→   801→            r="1.5"
+   802→   802→            fill="oklch(0.82 0.22 165 / 0.75)"
+   803→   803→          >
+   804→   804→            <title>{`${h.contest} · ${h.rating} · ${h.date.slice(0, 10)}`}</title>
+   805→   805→          </circle>
+   806→   806→        ) : null
+   807→   807→      )}
+   808→   808→      {/* peak marker */}
+   809→   809→      <circle
+   810→   810→        cx={r2(x(peakIdx))}
+   811→   811→        cy={r2(y(ratings[peakIdx]))}
+   812→   812→        r="2.5"
+   813→   813→        fill="oklch(0.72 0.25 320)"
+   814→   814→      >
+   815→   815→        <title>{`Peak ${ratings[peakIdx]} · ${history[peakIdx].contest}`}</title>
+   816→   816→      </circle>
+   817→   817→      {/* latest marker */}
+   818→   818→      <circle
+   819→   819→        cx={r2(x(lastIdx))}
+   820→   820→        cy={r2(y(ratings[lastIdx]))}
+   821→   821→        r="2.5"
+   822→   822→        fill="oklch(0.82 0.22 165)"
+   823→   823→      >
+   824→   824→        <title>{`Latest ${ratings[lastIdx]} · ${history[lastIdx].contest}`}</title>
+   825→   825→      </circle>
+   826→   826→      <text
+   827→   827→        x={r2(peakTextX)}
+   828→   828→        y={TOP}
+   829→   829→        textAnchor={peakLeft ? "start" : "end"}
+   830→   830→        fontSize="7"
+   831→   831→        fontFamily="ui-monospace, monospace"
+   832→   832→        fill="oklch(0.72 0.25 320)"
+   833→   833→      >
+   834→   834→        PEAK {ratings[peakIdx]}
+   835→   835→      </text>
+   836→   836→    </svg>
+   837→   837→  );
+   838→   838→}
+   839→   839→
+   840→   840→function CodeforcesBody({ stats }: { stats: CodeforcesStats }) {
+   841→   841→  const tier = cfTier(stats.rank);
+   842→   842→  const bestRank = stats.ratingHistory.length
+   843→   843→    ? Math.min(
+   844→   844→        ...stats.ratingHistory.map((h) => h.rank).filter((r): r is number => r != null)
+   845→   845→      )
+   846→   846→    : null;
+   847→   847→
+   848→   848→  return (
+   849→   849→    <div className="flex flex-1 flex-col items-center justify-center gap-1 py-1 text-center">
+   850→   850→      <div className="font-mono text-[8px] tracking-[0.25em] text-muted-foreground">
+   851→   851→        CURRENT RATING
+   852→   852→      </div>
+   853→   853→      <div className={`font-display text-5xl font-black leading-none ${tier.text}`}>
+   854→   854→        {stats.rating ?? "—"}
+   855→   855→      </div>
+   856→   856→      <div
+   857→   857→        className={`mt-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-0.5 font-mono text-[8px] tracking-[0.2em] ${tier.text}`}
+   858→   858→      >
+   859→   859→        {tier.label}
+   860→   860→      </div>
+   861→   861→
+   862→   862→      {/* rating trajectory */}
+   863→   863→      <div className="mt-4 w-full">
+   864→   864→        <div className="mb-1.5 flex items-center justify-between font-mono text-[8px] tracking-[0.2em] text-muted-foreground">
+   865→   865→          <span>RATING TRAJECTORY</span>
+   866→   866→          <span>
+   867→   867→            {stats.contestsCount ?? stats.ratingHistory.length} CONTESTS
+   868→   868→          </span>
+   869→   869→        </div>
+   870→   870→        <RatingTrajectory history={stats.ratingHistory} />
+   871→   871→      </div>
+   872→   872→
+   873→   873→      {/* meta row */}
+   874→   874→      <div className="flex w-full flex-wrap justify-center gap-x-4 gap-y-1 border-t border-white/5 pt-3 font-mono text-[8px] tracking-[0.15em] text-muted-foreground">
+   875→   875→        <span>
+   876→   876→          PEAK <span className="text-[oklch(0.72_0.25_320)]">{stats.maxRating ?? "—"}</span>
+   877→   877→        </span>
+   878→   878→        {bestRank != null && (
+   879→   879→          <span>
+   880→   880→            BEST RANK <span className="text-[oklch(0.78_0.20_195)]">#{bestRank}</span>
+   881→   881→          </span>
+   882→   882→        )}
+   883→   883→        <span>
+   884→   884→          CONTRIBUTION{" "}
+   885→   885→          <span className={stats.contribution >= 0 ? "text-[oklch(0.82_0.22_165)]" : "text-[oklch(0.72_0.25_320)]"}>
+   886→   886→            {stats.contribution >= 0 ? "+" : ""}
+   887→   887→            {stats.contribution}
+   888→   888→          </span>
+   889→   889→        </span>
+   890→   890→      </div>
+   891→   891→    </div>
+   892→   892→  );
+   893→   893→}
+   894→   894→
+   895→   895→/* ================= GitHub ================= */
+   896→   896→function GitHubBody({ stats }: { stats: GitHubStats }) {
+   897→   897→  const cells = [
+   898→   898→    { label: "REPOS", value: stats.repos },
+   899→   899→    { label: "STARS", value: stats.stars },
+   900→   900→    { label: "FOLLOWERS", value: stats.followers.toLocaleString() },
+   901→   901→    { label: "FOLLOWING", value: stats.following },
+   902→   902→  ];
+   903→   903→  const since = stats.memberSince
+   904→   904→    ? new Date(stats.memberSince).getFullYear()
+   905→   905→    : null;
+   906→   906→
+   907→   907→  return (
+   908→   908→    <div className="flex flex-1 flex-col gap-4">
+   909→   909→      <div className="grid grid-cols-2 gap-2.5">
+   910→   910→        {cells.map((c, i) => (
+   911→   911→          <motion.div
+   912→   912→            key={c.label}
+   913→   913→            initial={{ opacity: 0, y: 12 }}
+   914→   914→            animate={{ opacity: 1, y: 0 }}
+   915→   915→            transition={{ delay: 0.15 + i * 0.08 }}
+   916→   916→            className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2.5"
+   917→   917→          >
+   918→   918→            <div className="font-display text-xl font-bold text-[oklch(0.78_0.20_195)]">
+   919→   919→              {c.value}
+   920→   920→            </div>
+   921→   921→            <div className="mt-0.5 font-mono text-[8px] tracking-[0.18em] text-muted-foreground">
+   922→   922→              {c.label}
+   923→   923→            </div>
+   924→   924→          </motion.div>
+   925→   925→        ))}
+   926→   926→      </div>
+   927→   927→
+   928→   928→      {/* contribution grid */}
+   929→   929→      {stats.contributions != null && (
+   930→   930→        <div className="border-t border-white/5 pt-3">
+   931→   931→          <div className="mb-1.5 flex items-center justify-between font-mono text-[8px] tracking-[0.2em] text-muted-foreground">
+   932→   932→            <span>CONTRIBUTION GRID · 1Y</span>
+   933→   933→            <span>
+   934→   934→              <span className="text-[oklch(0.78_0.20_195)]">
+   935→   935→                {(stats.totalContributions ?? 0).toLocaleString()}
+   936→   936→              </span>{" "}
+   937→   937→              EVENTS
+   938→   938→            </span>
+   939→   939→          </div>
+   940→   940→          <MiniHeatmap
+   941→   941→            days={stats.contributions}
+   942→   942→            thresholds={[1, 3, 6, 10]}
+   943→   943→            unit="contributions"
+   944→   944→            palette="cyan"
+   945→   945→          />
+   946→   946→        </div>
+   947→   947→      )}
+   948→   948→
+   949→   949→      {stats.topLanguages.length > 0 && (
+   950→   950→        <div>
+   951→   951→          <div className="mb-1.5 font-mono text-[8px] tracking-[0.2em] text-muted-foreground">
+   952→   952→            TOP LANGUAGES
+   953→   953→          </div>
+   954→   954→          <div className="flex flex-wrap gap-1.5">
+   955→   955→            {stats.topLanguages.map((lang) => (
+   956→   956→              <span
+   957→   957→                key={lang}
+   958→   958→                className="rounded-full border border-[oklch(0.78_0.20_195/0.3)] bg-[oklch(0.78_0.20_195/0.08)] px-2.5 py-0.5 font-mono text-[8px] tracking-[0.1em] text-[oklch(0.78_0.20_195)]"
+   959→   959→              >
+   960→   960→                {lang}
+   961→   961→              </span>
+   962→   962→            ))}
+   963→   963→          </div>
+   964→   964→        </div>
+   965→   965→      )}
+   966→   966→
+   967→   967→      {since && (
+   968→   968→        <div className="mt-auto border-t border-white/5 pt-3 font-mono text-[8px] tracking-[0.15em] text-muted-foreground">
+   969→   969→          TRANSMITTING SINCE <span className="text-[oklch(0.78_0.20_195)]">{since}</span>
+   970→   970→        </div>
+   971→   971→      )}
+   972→   972→    </div>
+   973→   973→  );
+   974→   974→}
+   975→   975→

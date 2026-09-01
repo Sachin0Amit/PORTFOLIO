@@ -22,7 +22,9 @@ const SUCCESS_TTL_MS = 10 * 60 * 1000;
 const FAILURE_TTL_MS = 2 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 8000;
 
-type FetchResult<T> = { ok: true; stats: T } | { ok: false; error: string };
+type FetchResult<T> =
+  | { ok: true; stats: T; ttlMs?: number }
+  | { ok: false; error: string; ttlMs?: number };
 
 interface CacheEntry {
   expiresAt: number;
@@ -93,7 +95,11 @@ async function withCache<T>(key: string, fetcher: () => Promise<FetchResult<T>>)
   }
   const value = await fetcher();
   cache.set(key, {
-    expiresAt: Date.now() + (value.ok ? SUCCESS_TTL_MS : FAILURE_TTL_MS),
+    expiresAt:
+      Date.now() +
+      (value.ok
+        ? value.ttlMs ?? SUCCESS_TTL_MS
+        : value.ttlMs ?? FAILURE_TTL_MS),
     value: value.ok
       ? { ok: true, stats: value.stats }
       : { ok: false, error: value.error },
@@ -410,22 +416,93 @@ async function fetchGhContributions(
   return { days: parseGhContributions(res.text) };
 }
 
+/* ---- token-less fallback scrapers (different rate bucket than the API) ---- */
+
+/** "1.2k" / "3,400" / "12" → number. */
+function parseGhCount(raw: string): number {
+  const s = raw.trim().replace(/,/g, "");
+  const n = parseFloat(s);
+  if (Number.isNaN(n)) return 0;
+  return Math.round(/k/i.test(s) ? n * 1000 : n);
+}
+
+interface GhProfileScrape {
+  avatarUrl: string | null;
+  repos: number | null;
+}
+
+/**
+ * The signed-out profile page ships `<meta property="og:description"
+ * content="{user} has N repositories available…">` and an og:image avatar.
+ * Both are stable GitHub metadata tags.
+ */
+function parseGhProfileHtml(html: string): GhProfileScrape {
+  const avatarUrl =
+    html.match(/<meta property="og:image" content="([^"]+)"/)?.[1] ?? null;
+  const repoMatch = html.match(/has ([\d.,]+) repositories? available/);
+  return {
+    avatarUrl,
+    repos: repoMatch ? parseGhCount(repoMatch[1]) : null,
+  };
+}
+
+/**
+ * The public repositories tab lists each repo with
+ * `<span id="repo-stars-counter-star">N</span>` (omitted at 0 stars) and
+ * `<span itemprop="programmingLanguage">X</span>` chips.
+ */
+function parseGhReposHtml(html: string): {
+  stars: number;
+  languages: [string, number][];
+} {
+  let stars = 0;
+  for (const m of html.matchAll(/repo-stars-counter-star[^>]*>([\d.,]+[kK]?)/g)) {
+    stars += parseGhCount(m[1]);
+  }
+  const langCounts = new Map<string, number>();
+  for (const m of html.matchAll(/itemprop="programmingLanguage">([^<]+)</g)) {
+    const lang = m[1].trim();
+    if (lang) langCounts.set(lang, (langCounts.get(lang) ?? 0) + 1);
+  }
+  return { stars, languages: [...langCounts.entries()] };
+}
+
+async function fetchGhHtml(
+  path: string
+): Promise<{ ok: true; text: string } | { ok: false }> {
+  const res = await fetchTextRaw(`https://github.com${path}`, {
+    headers: { "User-Agent": GH_SCRAPE_UA, Accept: "text/html" },
+  });
+  return res.ok ? { ok: true, text: res.text } : { ok: false };
+}
+
 export function fetchGitHub(handle: string): Promise<FetchResult<GitHubStats>> {
   return withCache("github", async () => {
-    const userRes = await fetchJson(
-      `https://api.github.com/users/${encodeURIComponent(handle)}`,
-      { headers: githubHeaders() }
-    );
-    if (!userRes.ok) return userRes;
+    const enc = encodeURIComponent(handle);
+    // API profile, API repos and the HTML contribution grid are independent —
+    // fetch them in parallel so one slow upstream never blocks the card.
+    const [userRes, reposRes, contribRes] = await Promise.all([
+      fetchJson(`https://api.github.com/users/${enc}`, {
+        headers: githubHeaders(),
+      }),
+      fetchJson(
+        `https://api.github.com/users/${enc}/repos?per_page=100&sort=pushed`,
+        { headers: githubHeaders() }
+      ),
+      fetchGhContributions(handle),
+    ]);
+
+    if (!userRes.ok) {
+      // 404 etc. are real errors; rate limiting gets the HTML fallback.
+      if (userRes.error !== "UPSTREAM RATE LIMITED") return userRes;
+      return ghScrapeFallback(handle, contribRes.days);
+    }
+
     const user = userRes.data as GhUser;
 
     // Sum stars + top languages from the most recently pushed repos.
     let stars = 0;
     const langCounts = new Map<string, number>();
-    const reposRes = await fetchJson(
-      `https://api.github.com/users/${encodeURIComponent(handle)}/repos?per_page=100&sort=pushed`,
-      { headers: githubHeaders() }
-    );
     if (reposRes.ok) {
       for (const repo of reposRes.data as GhRepo[]) {
         if (repo.fork) continue;
@@ -435,13 +512,6 @@ export function fetchGitHub(handle: string): Promise<FetchResult<GitHubStats>> {
         }
       }
     }
-
-    // Public contribution grid (scraped, optional — stats stay live without it)
-    const { days: contributions } = await fetchGhContributions(handle);
-    const totalContributions =
-      contributions == null
-        ? null
-        : contributions.reduce((sum, d) => sum + d.count, 0);
 
     const stats: GitHubStats = {
       repos: user.public_repos ?? 0,
@@ -454,11 +524,58 @@ export function fetchGitHub(handle: string): Promise<FetchResult<GitHubStats>> {
         .slice(0, 3)
         .map(([lang]) => lang),
       avatarUrl: user.avatar_url ?? null,
-      contributions,
-      totalContributions,
+      contributions: contribRes.days,
+      totalContributions:
+        contribRes.days == null
+          ? null
+          : contribRes.days.reduce((sum, d) => sum + d.count, 0),
     };
     return { ok: true, stats };
   });
+}
+
+/**
+ * API throttled → rebuild the card from public HTML pages (profile +
+ * repositories tab + contribution grid, all outside the API rate bucket).
+ * Follower/following counts aren't exposed there, so the UI marks the
+ * feed "partial". Cached for the failure TTL only, so the full API is
+ * retried soon after the hourly quota resets.
+ */
+async function ghScrapeFallback(
+  handle: string,
+  contributions: DayCount[] | null
+): Promise<FetchResult<GitHubStats>> {
+  const [profileRes, reposTabRes] = await Promise.all([
+    fetchGhHtml(`/${encodeURIComponent(handle)}`),
+    fetchGhHtml(`/${encodeURIComponent(handle)}?tab=repositories`),
+  ]);
+  const profile =
+    profileRes.ok ? parseGhProfileHtml(profileRes.text) : null;
+  const reposTab = reposTabRes.ok ? parseGhReposHtml(reposTabRes.text) : null;
+
+  if (!profile && contributions == null) {
+    return { ok: false, error: "UPSTREAM RATE LIMITED" };
+  }
+
+  const stats: GitHubStats = {
+    repos: profile?.repos ?? 0,
+    stars: reposTab?.stars ?? 0,
+    followers: 0,
+    following: 0,
+    memberSince: null,
+    topLanguages: [...(reposTab?.languages ?? [])]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([lang]) => lang),
+    avatarUrl: profile?.avatarUrl ?? null,
+    contributions,
+    totalContributions:
+      contributions == null
+        ? null
+        : contributions.reduce((sum, d) => sum + d.count, 0),
+    partial: true,
+  };
+  return { ok: true, stats, ttlMs: FAILURE_TTL_MS };
 }
 
 /* ================= dispatcher ================= */
