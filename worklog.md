@@ -119,3 +119,37 @@ Unresolved issues / next-phase priorities:
 - Testimonials currently has QA test data (Test Visitor, Ananya Singh) — harmless but could be cleared
 - Konami easter egg + sound toggle not explicitly tested this round (code intact from reference)
 - Consider: seed a few real testimonials, add projects' real links, maybe site favicon with alien glyph
+
+---
+Task ID: 7
+Agent: main (Z.ai Code) — direct user request
+Task: User asked to change the "Academic Telemetry" section's entire style/design — full visual redesign of Performance.tsx
+
+Work Log:
+- Located "ACADEMIC TELEMETRY" = Performance.tsx (section id="performance", anchored by Navbar/SectionRail/CommandPalette/Footer — all kept intact)
+- Old design: recharts RadialBarChart gauge + 4 floating TiltCard metric tiles + shimmer progress bar (scattered glass cards, standard dashboard look)
+- New design: ONE unified mission-control instrument console with HUD corner brackets, scanlines + fine-grid texture, top edge light:
+  - Console header strip: 3 status LEDs (flicker/blink/pulse), "ACAD.SYS // SEMESTER FEED" label, live ticking SYS.TIME clock (useClock, en-GB 24h, hydration-safe "--:--:--" initial), pinging LIVE badge
+  - Left panel: custom hand-built SVG speedometer (NO recharts) — 240° sweep, gradient value arc animated via framer-motion pathLength (0 → 0.81), 21 tick marks (bright up to 8.1), scale numbers 0-10 (8 highlighted alien, 10 plasma), sweeping needle (motion.g rotate -120° → 74.4°, transformBox view-box), center hub, pulsing endpoint dot, dashed plasma target zone (9→10) with TGT label
+  - Digital readout: count-up 0 → 8.1 (useCountUp rAF, cubic ease-out), "SGPA / 10.0", "GRADE A · 81% NOMINAL" chip, performance.note
+  - Right panel: 6 datasheet-style DATA READOUT rows (SEMESTER 01/08, GRADE BAND A·DISTINCTION, PERCENTILE ~81%, TARGET SGPA 9.0+, CREDIT LOAD FULL, STATUS NOMINAL w/ ping dot) with dotted leader lines, staggered slide-in, hover bg + animated left accent bar
+  - Waveform strip: dual traveling EKG-style SVG oscilloscope (alien + plasma layers, opposite directions/speeds, mask fade edges, vectorEffect non-scaling-stroke) + SIGNAL·OK tag
+  - Program tracker: 8 B.Tech semester segments — SEM 01 filled "8.1" (glow), SEM 02 animated diagonal stripes (stripe-live, seamless 16.97px loop), 03-08 queued; legend row
+  - Console footer strip: CALIBRATION 8.1/10.0 · CHANNEL CSE·Y2 + FEED STABLE
+- globals.css: added .stripe-live + @keyframes stripeSlide, .wave-track/.wave-track-slow + @keyframes waveSlide (all under existing reduced-motion kill switch)
+- Removed recharts + TiltCard imports from Performance (recharts stays installed for ui/chart.tsx)
+- FIXED hydration mismatch: raw SVG line/text coords drifted between Node SSR and Chrome ("47.979862216582404" vs "...41") → all coords now pre-rounded via r2() toFixed(2) strings (TICKS array, scale numbers, TGT label, endpoint circles)
+- QA (agent-browser): fresh load = 0 console errors, 0 page errors (hydration fixed); structure verified via DOM (gauge svg 300px, 6 rows, 8 segments, clock/LIVE/SIGNAL·OK/FEED STABLE/8.1 all present); animations verified (needle style.transform = rotate(74.4deg), counter reached 8.1, value arc dasharray 0.81px 1px); navbar TELEMETRY link scrolls section to top:0; mobile 390px: no horizontal overflow (scrollW=clientW=390)
+- VLM visual QA: desktop (console frame, gauge arc/ticks/numbers/needle/TGT all correct, dotted leaders aligned, no glitches), tracker area (8 segments w/ 8.1+LIVE, waveform + SIGNAL·OK, CALIBRATION/FEED STABLE footer), mobile (gauge centered, rows clean, 8 segments fit w/ readable text)
+- Note: hover effects (row bg + accent bar) gated by Tailwind v4 @media (hover: hover) — headless Chrome reports (hover: none) so they can't render in QA, but rules verified present in stylesheet; will work on real pointer devices (same as all other site hover effects)
+- tsc clean (app code), eslint clean, dev server 200
+
+Stage Summary:
+- Performance/Academic Telemetry section completely redesigned from scattered glass-card dashboard into a single cohesive sci-fi mission-control console: custom SVG speedometer gauge with animated needle + target zone, live clock, datasheet readout rows, traveling EKG waveform, and 8-semester program tracker (new content dimension)
+- Hydration mismatch root-caused (SSR/client float drift on SVG coords) and fixed with 2-decimal rounding
+- All anchors (#performance) and shared SectionHeading rhythm preserved; verified end-to-end on desktop + mobile
+
+Unresolved issues / next-phase priorities:
+- Same as Task 6: social links "#", QA testimonial data, untested Konami/sound toggle
+- Semester tracker shows SEM 02 as "LIVE" — consistent with site's "Semester 1 recorded / currently enrolled" story, but if user is actually in a later semester the tracker mapping should be updated
+- recharts now only used by unused ui/chart.tsx — could be dropped from deps if desired

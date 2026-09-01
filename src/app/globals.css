@@ -466,3 +466,31 @@ kbd {
 .text-balance {
   text-wrap: balance;
 }
+
+/* ============ TELEMETRY CONSOLE ============ */
+/* Animated "live" stripes for the current semester segment */
+.stripe-live {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    oklch(0.78 0.20 195 / 22%) 0 6px,
+    oklch(0.78 0.20 195 / 7%) 6px 12px
+  );
+  animation: stripeSlide 1.1s linear infinite;
+}
+@keyframes stripeSlide {
+  from { background-position: 0 0; }
+  to { background-position: 16.97px 0; } /* 12px / cos(45deg) — seamless loop */
+}
+
+/* Traveling telemetry waveform tracks */
+.wave-track {
+  animation: waveSlide 5s linear infinite;
+  will-change: transform;
+}
+.wave-track-slow {
+  animation: waveSlide 8.5s linear infinite reverse;
+}
+@keyframes waveSlide {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
