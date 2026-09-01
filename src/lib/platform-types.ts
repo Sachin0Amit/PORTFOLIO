@@ -14,6 +14,12 @@ export interface LeetCodeRecentSolve {
   timestamp: string; // ISO string
 }
 
+/** A single day of activity on a platform (heatmap cell). */
+export interface DayCount {
+  date: string; // YYYY-MM-DD
+  count: number;
+}
+
 export interface LeetCodeStats {
   totalSolved: number;
   easy: number;
@@ -25,6 +31,17 @@ export interface LeetCodeStats {
   avatarUrl: string | null;
   recentSolves: LeetCodeRecentSolve[];
   skillTags: string[];
+  /** Sparse list of days with accepted submissions (UTC dates). */
+  submissionDays: DayCount[];
+  streak: number | null;
+  totalActiveDays: number | null;
+}
+
+export interface CodeforcesHistoryPoint {
+  contest: string;
+  rating: number;
+  rank: number | null;
+  date: string; // ISO string
 }
 
 export interface CodeforcesStats {
@@ -34,6 +51,10 @@ export interface CodeforcesStats {
   maxRank: string | null;
   contribution: number;
   avatarUrl: string | null;
+  /** Most recent contests (capped), oldest → newest. */
+  ratingHistory: CodeforcesHistoryPoint[];
+  /** Total contests ever attended (null = history unavailable). */
+  contestsCount: number | null;
 }
 
 export interface GitHubStats {
@@ -44,6 +65,9 @@ export interface GitHubStats {
   memberSince: string | null;
   topLanguages: string[];
   avatarUrl: string | null;
+  /** Sparse public contribution days for the trailing year (null = unavailable). */
+  contributions: DayCount[] | null;
+  totalContributions: number | null;
 }
 
 export type PlatformStats =

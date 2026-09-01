@@ -218,3 +218,31 @@ Unresolved issues / next-phase priorities:
 - LinkedIn/GitHub social links in Contact/Footer still "#" placeholders
 - GitHub unauthenticated rate limit (60/hr shared IP) — GITHUB_TOKEN env optional if SIGNAL LOST appears
 - Sandbox clock is set months ahead of the solve timestamp (2026-09 vs 2026-01) → relative time shows "7mo" in QA; on real visitor devices it will show the correct relative time
+
+---
+Task ID: 10
+Agent: main (Z.ai Code) — direct user request
+Task: User asked for grid systems of activity — "it should also show grid system of question solving and other things for leetcode and other things similar for codeforces and github"
+
+Work Log:
+- Probed 3 data sources first: LeetCode GraphQL userCalendar (streak/totalActiveDays/submissionCalendar JSON string) ✓, Codeforces REST user.rating (full contest history) ✓, GitHub contributions page HTML scrape (367 server-rendered td cells with data-date/data-level + tool-tip elements with exact counts, browser UA required) ✓
+- platform-types.ts: added DayCount {date, count}; LeetCodeStats += submissionDays, streak, totalActiveDays; new CodeforcesHistoryPoint + CodeforcesStats += ratingHistory (last 30), contestsCount; GitHubStats += contributions, totalContributions
+- platform-stats.ts: refactored fetchJson → shared fetchTextRaw transport (timeout/rate-limit logic, .text() + JSON.parse with UPSTREAM MALFORMED guard); LC query += userCalendar + parseLcCalendar (unix-sec keys → UTC YYYY-MM-DD sparse days); CF second fetch user.rating (BUGFIX: endpoint needs ?handle= singular, not ?handles= — first attempt silently returned 400 → 0 contests); GH third fetch github.com/users/{h}/contributions with Chrome UA + parseGhContributions regex (tool-tip counts mapped to td cells via contribution-day-component ids; < 300 cells parsed → null = grid gracefully skipped, stats stay live)
+- Platforms.tsx: new reusable MiniHeatmap component — trailing 52-week grid (Sun-first columns, last col = partial current week with transparent future cells), 4px cells + 1px gap = 260px wide, month labels (Sep→Aug, absolute-positioned on month-change columns), LESS/MORE 5-swatch legend, per-day title tooltips, sr-only summary; two palettes (amber for LC, cyan for GH); thresholds LC [1,3,5,8] / GH [1,3,6,10]
+- LeetCode card: new "SOLVING GRID · 52W" block with STREAK n d · ACTIVE n d header (after meta row)
+- Codeforces card: replaced old "% of peak" bar with "RATING TRAJECTORY" SVG chart (320×88 viewBox, motion.path pathLength draw-on animation, cyan→plasma gradient area fill, contest dots with <title> tooltips when ≤24 contests, plasma peak marker + PEAK label with side-aware textAnchor, alien latest marker, dashed empty state "NO CONTESTS LOGGED — TRAJECTORY ARMED"); new meta row PEAK / BEST RANK #n / CONTRIBUTION
+- GitHub card: new "CONTRIBUTION GRID · 1Y" block with total EVENTS count (after 2×2 stats, before languages)
+- BUGFIX: duplicate React keys — future cells in current week all keyed "51-0" → fixed with f-{wi}-{di} positional keys (fresh-session console now 0 errors)
+- QA: tsc clean, eslint clean; LeetCode grid live-verified (360 titled cells, exactly 1 lit cell "1 solves · 2026-01-08", 12 month labels, STREAK 1d/ACTIVE 1d, legend); CF verified by temporarily connecting @neal (rating 3055 LGTM, trajectory chart with 155 contests, PEAK 3147, BEST RANK #9, 4 chart dots + animated line + PEAK 3117 label — chart peak is within the 30-contest window, all-time peak shown in meta row); GH contribution grid verified via agent-browser network route mock (**/api/platforms* pattern with 195 active days/1520 events) because shared sandbox IP hit GitHub's 60/hr unauth API quota (403) — UI renders cyan heatmap perfectly with varying intensities; test handles DISCONNECTED after QA; VLM visual QA on all 3 new visuals (desktop + mobile 390px, scrollW=clientW=390, grids fit, month labels cramped-but-legible at 390px); final fresh-session console: 0 errors
+
+Stage Summary:
+- All three platform cards now have rich activity visualizations: LeetCode SOLVING GRID heatmap (streak + active days), Codeforces RATING TRAJECTORY animated line chart (contests count, best rank), GitHub CONTRIBUTION GRID 1-year heatmap (total events) — all real public data, no tokens required
+- Heatmap is a single shared component with per-card palettes; auto-fills as the user solves/commits — Sachin's LC grid will light up cell by cell as he solves problems
+- GitHub contribution grid works WITHOUT any token (HTML scrape) and degrades gracefully to no-grid if GitHub changes their page structure
+
+Unresolved issues / next-phase priorities:
+- Still awaiting user's GitHub username + Codeforces handle (cards in honest STANDBY; POST /api/platforms to connect)
+- GitHub shared-IP rate limit (60/hr unauth) intermittently degrades the GH card stats (grid scrape unaffected but unreachable while user.info fails) — GITHUB_TOKEN env is the permanent fix if user provides a PAT
+- Chart peak (30-contest window) can differ from all-time PEAK in meta row for users with 30+ contests (neal case); harmless, matches for typical student profiles
+- LC heatmap dates are UTC-keyed vs visitor-local grid → possible ±1-day drift for extreme timezones (cosmetic only)
+- Old "SIGNAL LOST" console errors seen during QA were stale CLI buffer artifacts — fresh sessions are clean

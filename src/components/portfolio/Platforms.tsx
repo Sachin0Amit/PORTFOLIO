@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Code2,
@@ -14,7 +14,9 @@ import {
 } from "lucide-react";
 import { SectionHeading } from "./SectionHeading";
 import type {
+  CodeforcesHistoryPoint,
   CodeforcesStats,
+  DayCount,
   GitHubStats,
   LeetCodeStats,
   PlatformResponse,
@@ -370,6 +372,159 @@ function LiveBody({
   return <GitHubBody stats={stats as GitHubStats} />;
 }
 
+/* ================= activity heatmap (shared) ================= */
+
+const HEAT_WEEKS = 52;
+const HEAT_CELL = 4; // px
+const HEAT_GAP = 1; // px
+const HEAT_STEP = HEAT_CELL + HEAT_GAP;
+
+/** Per-platform intensity palettes (level 0 → 4). */
+const HEAT_PALETTES = {
+  amber: [
+    "bg-white/[0.05]",
+    "bg-[oklch(0.75_0.22_90/0.3)]",
+    "bg-[oklch(0.75_0.22_90/0.5)]",
+    "bg-[oklch(0.75_0.22_90/0.75)]",
+    "bg-[oklch(0.75_0.22_90)] shadow-[0_0_5px_oklch(0.75_0.22_90/0.5)]",
+  ],
+  cyan: [
+    "bg-white/[0.05]",
+    "bg-[oklch(0.78_0.20_195/0.3)]",
+    "bg-[oklch(0.78_0.20_195/0.5)]",
+    "bg-[oklch(0.78_0.20_195/0.75)]",
+    "bg-[oklch(0.78_0.20_195)] shadow-[0_0_5px_oklch(0.78_0.20_195/0.5)]",
+  ],
+} as const;
+
+type HeatPalette = keyof typeof HEAT_PALETTES;
+
+interface HeatWeek {
+  cells: { date: string; count: number; future: boolean }[];
+  monthLabel: string | null;
+}
+
+function dateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+}
+
+/** Build the trailing 52-week grid (Sun-first columns, last col = current week). */
+function buildHeatWeeks(days: DayCount[]): HeatWeek[] {
+  const map = new Map(days.map((d) => [d.date, d.count]));
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  const lastSunday = new Date(today);
+  lastSunday.setDate(today.getDate() - today.getDay());
+
+  const weeks: HeatWeek[] = [];
+  let prevMonth = -1;
+  for (let w = HEAT_WEEKS - 1; w >= 0; w--) {
+    const weekStart = new Date(lastSunday);
+    weekStart.setDate(lastSunday.getDate() - w * 7);
+    const cells: { date: string; count: number; future: boolean }[] = [];
+    for (let dow = 0; dow < 7; dow++) {
+      const dt = new Date(weekStart);
+      dt.setDate(weekStart.getDate() + dow);
+      const future = dt > today;
+      cells.push({
+        date: future ? "" : dateKey(dt),
+        count: future ? 0 : (map.get(dateKey(dt)) ?? 0),
+        future,
+      });
+    }
+    const m = weekStart.getMonth();
+    const monthLabel = m !== prevMonth ? weekStart.toLocaleDateString("en", { month: "short" }) : null;
+    if (m !== prevMonth) prevMonth = m;
+    weeks.push({ cells, monthLabel });
+  }
+  return weeks;
+}
+
+function heatLevel(count: number, thresholds: number[]): number {
+  if (count <= 0) return 0;
+  if (count >= thresholds[2]) return 4;
+  if (count >= thresholds[1]) return 3;
+  if (count >= thresholds[0]) return 2;
+  return 1;
+}
+
+function MiniHeatmap({
+  days,
+  thresholds,
+  unit,
+  palette,
+}: {
+  days: DayCount[];
+  thresholds: number[];
+  unit: string;
+  palette: HeatPalette;
+}) {
+  const weeks = useMemo(() => buildHeatWeeks(days), [days]);
+  const activeTotal = days.reduce((s, d) => s + d.count, 0);
+  const levels = HEAT_PALETTES[palette];
+
+  return (
+    <div>
+      <div className="w-fit">
+        {/* month labels */}
+        <div className="relative mb-1 h-[8px]" aria-hidden>
+          {weeks.map((wk, wi) =>
+            wk.monthLabel ? (
+              <span
+                key={wk.cells[0].date || wi}
+                className="absolute font-mono text-[7px] leading-none text-muted-foreground/60"
+                style={{ left: `${wi * HEAT_STEP}px` }}
+              >
+                {wk.monthLabel}
+              </span>
+            ) : null
+          )}
+        </div>
+        {/* grid */}
+        <div className="flex" style={{ gap: `${HEAT_GAP}px` }}>
+          {weeks.map((wk, wi) => (
+            <div key={wk.cells[0].date || `w-${wi}`} className="flex flex-col" style={{ gap: `${HEAT_GAP}px` }}>
+              {wk.cells.map((c, di) => (
+                <span
+                  key={c.date || `f-${wi}-${di}`}
+                  title={
+                    c.future || c.date === ""
+                      ? undefined
+                      : c.count > 0
+                        ? `${c.count} ${unit} · ${c.date}`
+                        : `0 ${unit} · ${c.date}`
+                  }
+                  className={`h-[4px] w-[4px] rounded-[1px] ${
+                    c.future ? "bg-transparent" : levels[heatLevel(c.count, thresholds)]
+                  }`}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+      {/* legend */}
+      <div className="mt-2 flex items-center justify-between font-mono text-[7px] tracking-[0.15em] text-muted-foreground/70">
+        <span>
+          {activeTotal.toLocaleString()} {unit} · 52W
+        </span>
+        <span className="flex items-center gap-1">
+          LESS
+          {levels.map((cls, i) => (
+            <span key={i} className={`h-[4px] w-[4px] rounded-[1px] ${cls}`} />
+          ))}
+          MORE
+        </span>
+      </div>
+      <span className="sr-only">
+        Activity heatmap: {activeTotal} {unit} over the last 52 weeks.
+      </span>
+    </div>
+  );
+}
+
 /* ================= LeetCode ================= */
 
 /** LeetCode stores 5000001 as the "unranked" sentinel for new profiles. */
@@ -483,6 +638,24 @@ function LeetCodeBody({ stats }: { stats: LeetCodeStats }) {
         )}
       </div>
 
+      {/* solving grid */}
+      <div className="border-t border-white/5 pt-3">
+        <div className="mb-1.5 flex items-center justify-between font-mono text-[8px] tracking-[0.2em] text-muted-foreground">
+          <span>SOLVING GRID · 52W</span>
+          <span>
+            STREAK <span className="text-[oklch(0.75_0.22_90)]">{stats.streak ?? 0}d</span>
+            {" · "}ACTIVE{" "}
+            <span className="text-[oklch(0.75_0.22_90)]">{stats.totalActiveDays ?? 0}d</span>
+          </span>
+        </div>
+        <MiniHeatmap
+          days={stats.submissionDays}
+          thresholds={[1, 3, 5, 8]}
+          unit="solves"
+          palette="amber"
+        />
+      </div>
+
       {/* skill signals */}
       {stats.skillTags.length > 0 && (
         <div className="border-t border-white/5 pt-3">
@@ -541,11 +714,136 @@ function LeetCodeBody({ stats }: { stats: LeetCodeStats }) {
 }
 
 /* ================= Codeforces ================= */
+
+/** SVG rating-trajectory chart (client-rendered from fetched data). */
+function RatingTrajectory({ history }: { history: CodeforcesHistoryPoint[] }) {
+  if (history.length === 0) {
+    return (
+      <div className="flex h-[64px] items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.02] font-mono text-[8px] tracking-[0.18em] text-muted-foreground/60">
+        NO CONTESTS LOGGED — TRAJECTORY ARMED
+      </div>
+    );
+  }
+
+  const W = 320;
+  const H = 88;
+  const PX = 10;
+  const TOP = 12;
+  const BOT = 78;
+  const n = history.length;
+  const ratings = history.map((h) => h.rating);
+  let min = Math.min(...ratings);
+  let max = Math.max(...ratings);
+  if (min === max) {
+    min -= 50;
+    max += 50;
+  } else {
+    const pad = (max - min) * 0.08;
+    min -= pad;
+    max += pad;
+  }
+
+  const x = (i: number) => (n === 1 ? W / 2 : PX + (i / (n - 1)) * (W - 2 * PX));
+  const y = (r: number) => BOT - ((r - min) / (max - min)) * (BOT - TOP);
+
+  const r2 = (v: number) => v.toFixed(2);
+  const line = history
+    .map((h, i) => `${i === 0 ? "M" : "L"}${r2(x(i))},${r2(y(h.rating))}`)
+    .join(" ");
+  const area = `${line} L${r2(x(n - 1))},${BOT} L${r2(x(0))},${BOT} Z`;
+  const peakIdx = ratings.indexOf(Math.max(...ratings));
+  const lastIdx = n - 1;
+  // Label side depends on peak position so text never clips the viewBox.
+  const peakLeft = x(peakIdx) < W / 2;
+  const peakTextX = peakLeft ? x(peakIdx) + 6 : x(peakIdx) - 6;
+
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="h-auto w-full"
+      role="img"
+      aria-label={`Codeforces rating history across ${n} contests`}
+    >
+      <defs>
+        <linearGradient id="cfAreaGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="oklch(0.78 0.20 195)" stopOpacity="0.3" />
+          <stop offset="100%" stopColor="oklch(0.72 0.25 320)" stopOpacity="0.02" />
+        </linearGradient>
+      </defs>
+      {/* baseline */}
+      <line
+        x1={PX}
+        y1={BOT}
+        x2={W - PX}
+        y2={BOT}
+        stroke="oklch(1 0 0 / 0.08)"
+        strokeWidth="1"
+      />
+      <path d={area} fill="url(#cfAreaGrad)" />
+      <motion.path
+        d={line}
+        fill="none"
+        stroke="oklch(0.82 0.22 165)"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        initial={{ pathLength: 0 }}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 1.4, ease: [0.22, 1, 0.36, 1] }}
+      />
+      {/* data points (with tooltips when sparse) */}
+      {history.map((h, i) =>
+        n <= 24 || i === peakIdx || i === lastIdx ? (
+          <circle
+            key={i}
+            cx={r2(x(i))}
+            cy={r2(y(h.rating))}
+            r="1.5"
+            fill="oklch(0.82 0.22 165 / 0.75)"
+          >
+            <title>{`${h.contest} · ${h.rating} · ${h.date.slice(0, 10)}`}</title>
+          </circle>
+        ) : null
+      )}
+      {/* peak marker */}
+      <circle
+        cx={r2(x(peakIdx))}
+        cy={r2(y(ratings[peakIdx]))}
+        r="2.5"
+        fill="oklch(0.72 0.25 320)"
+      >
+        <title>{`Peak ${ratings[peakIdx]} · ${history[peakIdx].contest}`}</title>
+      </circle>
+      {/* latest marker */}
+      <circle
+        cx={r2(x(lastIdx))}
+        cy={r2(y(ratings[lastIdx]))}
+        r="2.5"
+        fill="oklch(0.82 0.22 165)"
+      >
+        <title>{`Latest ${ratings[lastIdx]} · ${history[lastIdx].contest}`}</title>
+      </circle>
+      <text
+        x={r2(peakTextX)}
+        y={TOP}
+        textAnchor={peakLeft ? "start" : "end"}
+        fontSize="7"
+        fontFamily="ui-monospace, monospace"
+        fill="oklch(0.72 0.25 320)"
+      >
+        PEAK {ratings[peakIdx]}
+      </text>
+    </svg>
+  );
+}
+
 function CodeforcesBody({ stats }: { stats: CodeforcesStats }) {
   const tier = cfTier(stats.rank);
-  const max = stats.maxRating ?? stats.rating ?? 1;
-  const current = stats.rating ?? 0;
-  const ratio = Math.min(1, current / max);
+  const bestRank = stats.ratingHistory.length
+    ? Math.min(
+        ...stats.ratingHistory.map((h) => h.rank).filter((r): r is number => r != null)
+      )
+    : null;
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-1 py-1 text-center">
@@ -561,27 +859,33 @@ function CodeforcesBody({ stats }: { stats: CodeforcesStats }) {
         {tier.label}
       </div>
 
-      {/* rating vs peak bar */}
+      {/* rating trajectory */}
       <div className="mt-4 w-full">
-        <div className="mb-1 flex items-center justify-between font-mono text-[8px] tracking-[0.18em] text-muted-foreground">
-          <span>PEAK {stats.maxRating ?? "—"}</span>
-          <span>{Math.round(ratio * 100)}% OF PEAK</span>
+        <div className="mb-1.5 flex items-center justify-between font-mono text-[8px] tracking-[0.2em] text-muted-foreground">
+          <span>RATING TRAJECTORY</span>
+          <span>
+            {stats.contestsCount ?? stats.ratingHistory.length} CONTESTS
+          </span>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${ratio * 100}%` }}
-            transition={{ duration: 1, delay: 0.2 }}
-            className="h-full rounded-full bg-gradient-to-r from-[oklch(0.78_0.20_195)] to-[oklch(0.72_0.25_320)]"
-          />
-        </div>
+        <RatingTrajectory history={stats.ratingHistory} />
       </div>
 
-      <div className="mt-3 font-mono text-[8px] tracking-[0.15em] text-muted-foreground">
-        CONTRIBUTION{" "}
-        <span className={stats.contribution >= 0 ? "text-[oklch(0.82_0.22_165)]" : "text-[oklch(0.72_0.25_320)]"}>
-          {stats.contribution >= 0 ? "+" : ""}
-          {stats.contribution}
+      {/* meta row */}
+      <div className="flex w-full flex-wrap justify-center gap-x-4 gap-y-1 border-t border-white/5 pt-3 font-mono text-[8px] tracking-[0.15em] text-muted-foreground">
+        <span>
+          PEAK <span className="text-[oklch(0.72_0.25_320)]">{stats.maxRating ?? "—"}</span>
+        </span>
+        {bestRank != null && (
+          <span>
+            BEST RANK <span className="text-[oklch(0.78_0.20_195)]">#{bestRank}</span>
+          </span>
+        )}
+        <span>
+          CONTRIBUTION{" "}
+          <span className={stats.contribution >= 0 ? "text-[oklch(0.82_0.22_165)]" : "text-[oklch(0.72_0.25_320)]"}>
+            {stats.contribution >= 0 ? "+" : ""}
+            {stats.contribution}
+          </span>
         </span>
       </div>
     </div>
@@ -620,6 +924,27 @@ function GitHubBody({ stats }: { stats: GitHubStats }) {
           </motion.div>
         ))}
       </div>
+
+      {/* contribution grid */}
+      {stats.contributions != null && (
+        <div className="border-t border-white/5 pt-3">
+          <div className="mb-1.5 flex items-center justify-between font-mono text-[8px] tracking-[0.2em] text-muted-foreground">
+            <span>CONTRIBUTION GRID · 1Y</span>
+            <span>
+              <span className="text-[oklch(0.78_0.20_195)]">
+                {(stats.totalContributions ?? 0).toLocaleString()}
+              </span>{" "}
+              EVENTS
+            </span>
+          </div>
+          <MiniHeatmap
+            days={stats.contributions}
+            thresholds={[1, 3, 6, 10]}
+            unit="contributions"
+            palette="cyan"
+          />
+        </div>
+      )}
 
       {stats.topLanguages.length > 0 && (
         <div>

@@ -1,6 +1,7 @@
 
 import type {
   CodeforcesStats,
+  DayCount,
   GitHubStats,
   LeetCodeStats,
   PlatformId,
@@ -39,6 +40,20 @@ async function fetchJson(
   url: string,
   init?: RequestInit
 ): Promise<{ ok: true; data: unknown } | { ok: false; error: string }> {
+  const raw = await fetchTextRaw(url, init);
+  if (!raw.ok) return raw;
+  try {
+    return { ok: true, data: JSON.parse(raw.text) };
+  } catch {
+    return { ok: false, error: "UPSTREAM MALFORMED" };
+  }
+}
+
+/** Shared transport (timeout + rate-limit mapping) for JSON and HTML fetches. */
+async function fetchTextRaw(
+  url: string,
+  init?: RequestInit
+): Promise<{ ok: true; text: string } | { ok: false; error: string }> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
@@ -60,7 +75,7 @@ async function fetchJson(
           : `UPSTREAM HTTP ${res.status}`,
       };
     }
-    return { ok: true, data: await res.json() };
+    return { ok: true, text: await res.text() };
   } catch (err) {
     const timedOut = err instanceof Error && err.name === "AbortError";
     return { ok: false, error: timedOut ? "TIMEOUT" : "NETWORK UNREACHABLE" };
@@ -97,6 +112,7 @@ const LC_QUERY = `query userPublicProfile($username: String!) {
       intermediate { tagName problemsSolved }
       advanced { tagName problemsSolved }
     }
+    userCalendar { streak totalActiveDays submissionCalendar }
   }
   userContestRanking(username: $username) { rating attendedContestsCount }
   recentAcSubmissionList(username: $username, limit: 3) {
@@ -123,6 +139,11 @@ interface LcResponse {
         intermediate?: LcTagCount[];
         advanced?: LcTagCount[];
       };
+      userCalendar?: {
+        streak?: number;
+        totalActiveDays?: number;
+        submissionCalendar?: string;
+      };
     } | null;
     userContestRanking?: {
       rating?: number;
@@ -134,6 +155,23 @@ interface LcResponse {
       timestamp?: string;
     }[] | null;
   };
+}
+
+/** Parse LeetCode's submissionCalendar JSON string into sparse day-counts. */
+function parseLcCalendar(raw: string | undefined): DayCount[] {
+  if (!raw) return [];
+  try {
+    const cal = JSON.parse(raw) as Record<string, number>;
+    return Object.entries(cal)
+      .map(([ts, count]) => ({
+        date: new Date(Number(ts) * 1000).toISOString().slice(0, 10),
+        count,
+      }))
+      .filter((d) => d.count > 0)
+      .sort((a, b) => a.date.localeCompare(b.date));
+  } catch {
+    return [];
+  }
 }
 
 export function fetchLeetCode(handle: string): Promise<FetchResult<LeetCodeStats>> {
@@ -213,6 +251,9 @@ export function fetchLeetCode(handle: string): Promise<FetchResult<LeetCodeStats
       avatarUrl: user.profile?.userAvatar ?? null,
       recentSolves,
       skillTags,
+      submissionDays: parseLcCalendar(user.userCalendar?.submissionCalendar),
+      streak: user.userCalendar?.streak ?? null,
+      totalActiveDays: user.userCalendar?.totalActiveDays ?? null,
     };
     return { ok: true, stats };
   });
@@ -235,6 +276,21 @@ interface CfResponse {
   result?: CfUser[];
 }
 
+interface CfRatingEntry {
+  contestId?: number;
+  contestName?: string;
+  rank?: number;
+  ratingUpdateTimeSeconds?: number;
+  newRating?: number;
+}
+
+interface CfRatingResponse {
+  status?: string;
+  result?: CfRatingEntry[];
+}
+
+const CF_HISTORY_CAP = 30;
+
 export function fetchCodeforces(handle: string): Promise<FetchResult<CodeforcesStats>> {
   return withCache("codeforces", async () => {
     const res = await fetchJson(
@@ -244,6 +300,26 @@ export function fetchCodeforces(handle: string): Promise<FetchResult<CodeforcesS
     const json = res.data as CfResponse;
     const user = json.result?.[0];
     if (!user) return { ok: false, error: "PROFILE NOT FOUND" };
+
+    // Rating trajectory (optional — profile stays live if history unavailable)
+    let ratingHistory: CodeforcesStats["ratingHistory"] = [];
+    let contestsCount: number | null = null;
+    const histRes = await fetchJson(
+      `https://codeforces.com/api/user.rating?handle=${encodeURIComponent(handle)}`
+    );
+    if (histRes.ok) {
+      const entries = (histRes.data as CfRatingResponse).result ?? [];
+      contestsCount = entries.length;
+      ratingHistory = entries.slice(-CF_HISTORY_CAP).map((e) => ({
+        contest: e.contestName ?? "Contest",
+        rating: e.newRating ?? 0,
+        rank: e.rank ?? null,
+        date: new Date(
+          (e.ratingUpdateTimeSeconds ?? 0) * 1000
+        ).toISOString(),
+      }));
+    }
+
     const stats: CodeforcesStats = {
       rating: user.rating ?? null,
       maxRating: user.maxRating ?? null,
@@ -251,6 +327,8 @@ export function fetchCodeforces(handle: string): Promise<FetchResult<CodeforcesS
       maxRank: user.maxRank ?? null,
       contribution: user.contribution ?? 0,
       avatarUrl: user.avatar ?? user.titlePhoto ?? null,
+      ratingHistory,
+      contestsCount,
     };
     return { ok: true, stats };
   });
@@ -282,6 +360,56 @@ function githubHeaders(): Record<string, string> {
   return headers;
 }
 
+/**
+ * Scrape the public contributions calendar from github.com/users/{h}/contributions.
+ * The page ships a server-rendered grid: <td data-date id="contribution-day-component-D-W"
+ * data-level> cells + <tool-tip for="..."> elements holding exact counts.
+ * Returns null whenever the structure doesn't match (grid simply not shown).
+ */
+const GH_SCRAPE_UA =
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
+
+function parseGhContributions(html: string): DayCount[] | null {
+  const counts = new Map<string, number>();
+  for (const m of html.matchAll(
+    /for="(contribution-day-component-\d+-\d+)"[^>]*>([\s\S]*?)<\/tool-tip>/g
+  )) {
+    const text = m[2].replace(/<[^>]+>/g, " ");
+    const n = text.match(/(\d+)\s+contributions?/);
+    if (n) counts.set(m[1], parseInt(n[1], 10));
+  }
+
+  const days: DayCount[] = [];
+  let parsedCells = 0;
+  for (const m of html.matchAll(
+    /data-date="(\d{4}-\d{2}-\d{2})"[^>]*id="(contribution-day-component-\d+-\d+)"[^>]*data-level="(\d)"/g
+  )) {
+    parsedCells++;
+    const count = counts.get(m[2]) ?? 0;
+    if (count > 0) days.push({ date: m[1], count });
+  }
+  // A full year renders 364-372 cells; fewer means GitHub changed the page.
+  if (parsedCells < 300) return null;
+  days.sort((a, b) => a.date.localeCompare(b.date));
+  return days;
+}
+
+async function fetchGhContributions(
+  handle: string
+): Promise<{ days: DayCount[] | null }> {
+  const res = await fetchTextRaw(
+    `https://github.com/users/${encodeURIComponent(handle)}/contributions`,
+    {
+      headers: {
+        "User-Agent": GH_SCRAPE_UA,
+        Accept: "text/html",
+      },
+    }
+  );
+  if (!res.ok) return { days: null };
+  return { days: parseGhContributions(res.text) };
+}
+
 export function fetchGitHub(handle: string): Promise<FetchResult<GitHubStats>> {
   return withCache("github", async () => {
     const userRes = await fetchJson(
@@ -308,6 +436,13 @@ export function fetchGitHub(handle: string): Promise<FetchResult<GitHubStats>> {
       }
     }
 
+    // Public contribution grid (scraped, optional — stats stay live without it)
+    const { days: contributions } = await fetchGhContributions(handle);
+    const totalContributions =
+      contributions == null
+        ? null
+        : contributions.reduce((sum, d) => sum + d.count, 0);
+
     const stats: GitHubStats = {
       repos: user.public_repos ?? 0,
       stars,
@@ -319,6 +454,8 @@ export function fetchGitHub(handle: string): Promise<FetchResult<GitHubStats>> {
         .slice(0, 3)
         .map(([lang]) => lang),
       avatarUrl: user.avatar_url ?? null,
+      contributions,
+      totalContributions,
     };
     return { ok: true, stats };
   });
