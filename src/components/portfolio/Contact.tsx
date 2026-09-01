@@ -111,8 +111,8 @@ export function Contact() {
                 {
                   icon: Mail,
                   label: "EMAIL",
-                  value: "sachin@example.com",
-                  href: "mailto:sachin@example.com",
+                  value: "sachinamit7144097@gmail.com",
+                  href: "mailto:sachinamit7144097@gmail.com",
                   color: "alien",
                 },
                 {

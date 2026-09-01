@@ -92,9 +92,24 @@ const LC_QUERY = `query userPublicProfile($username: String!) {
   matchedUser(username: $username) {
     profile { ranking userAvatar }
     submitStatsGlobal { acSubmissionNum { difficulty count } }
+    tagProblemCounts {
+      fundamental { tagName problemsSolved }
+      intermediate { tagName problemsSolved }
+      advanced { tagName problemsSolved }
+    }
   }
-  userContestRanking(username: $username) { rating }
+  userContestRanking(username: $username) { rating attendedContestsCount }
+  recentAcSubmissionList(username: $username, limit: 3) {
+    title
+    titleSlug
+    timestamp
+  }
 }`;
+
+interface LcTagCount {
+  tagName?: string;
+  problemsSolved?: number;
+}
 
 interface LcResponse {
   data?: {
@@ -103,8 +118,21 @@ interface LcResponse {
       submitStatsGlobal?: {
         acSubmissionNum?: { difficulty?: string; count?: number }[];
       };
+      tagProblemCounts?: {
+        fundamental?: LcTagCount[];
+        intermediate?: LcTagCount[];
+        advanced?: LcTagCount[];
+      };
     } | null;
-    userContestRanking?: { rating?: number } | null;
+    userContestRanking?: {
+      rating?: number;
+      attendedContestsCount?: number;
+    } | null;
+    recentAcSubmissionList?: {
+      title?: string;
+      titleSlug?: string;
+      timestamp?: string;
+    }[] | null;
   };
 }
 
@@ -134,6 +162,42 @@ export function fetchLeetCode(handle: string): Promise<FetchResult<LeetCodeStats
       else if (row.difficulty === "Hard") counts.hard = row.count ?? 0;
       else if (row.difficulty === "All") counts.total = row.count ?? 0;
     }
+
+    // Recent accepted submissions → problem feed (skip malformed rows)
+    const recentSolves = (json.data?.recentAcSubmissionList ?? [])
+      .filter(
+        (s): s is { title: string; titleSlug: string; timestamp: string } =>
+          Boolean(s.title && s.titleSlug && s.timestamp)
+      )
+      .slice(0, 3)
+      .map((s) => ({
+        title: s.title,
+        titleSlug: s.titleSlug,
+        // LeetCode returns unix seconds as a string
+        timestamp: new Date(Number(s.timestamp) * 1000).toISOString(),
+      }));
+
+    // Skill tags from solved-problem topic counts (dedup, most-solved first)
+    const tagMap = new Map<string, number>();
+    for (const tier of [
+      user.tagProblemCounts?.fundamental,
+      user.tagProblemCounts?.intermediate,
+      user.tagProblemCounts?.advanced,
+    ]) {
+      for (const tag of tier ?? []) {
+        if (!tag.tagName) continue;
+        tagMap.set(
+          tag.tagName,
+          Math.max(tagMap.get(tag.tagName) ?? 0, tag.problemsSolved ?? 0)
+        );
+      }
+    }
+    const skillTags = [...tagMap.entries()]
+      .filter(([, n]) => n > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([name]) => name);
+
     const stats: LeetCodeStats = {
       totalSolved: counts.total || counts.easy + counts.medium + counts.hard,
       easy: counts.easy,
@@ -144,7 +208,11 @@ export function fetchLeetCode(handle: string): Promise<FetchResult<LeetCodeStats
         json.data?.userContestRanking?.rating != null
           ? Math.round(json.data.userContestRanking.rating)
           : null,
+      contestsAttended:
+        json.data?.userContestRanking?.attendedContestsCount ?? 0,
       avatarUrl: user.profile?.userAvatar ?? null,
+      recentSolves,
+      skillTags,
     };
     return { ok: true, stats };
   });

@@ -192,3 +192,29 @@ Unresolved issues / next-phase priorities:
 - GitHub unauthenticated rate limit (60/hr shared IP): if the deployed card flips to SIGNAL LOST occasionally, ask user for a Personal Access Token (public read-only scope) and set GITHUB_TOKEN env
 - Social links in Footer/About still "#" placeholders — will be filled when user sends real profiles
 - Could later add: GitHub contribution heatmap (needs token+GraphQL), LeetCode recent-contest history, streak stats
+
+---
+Task ID: 9
+Agent: main (Z.ai Code) — direct user request
+Task: User sent real LeetCode identity — "sachin0amit this is my leetcode it and email is sachinamit7144097@gmail.com" — connect the live LeetCode uplink and wire the real email into the site
+
+Work Log:
+- Tested LeetCode public GraphQL from sandbox: username sachin0amit resolves — totalSolved 1 (1 Hard, 0 Easy, 0 Medium), ranking 5000001 (LeetCode's "unranked" sentinel for new accounts), contest data null (0 contests attended), avatar assets.leetcode.com/users/sachin0amit/avatar_1767690583.png
+- Extended GraphQL query with: tagProblemCounts (fundamental/intermediate/advanced) → skill tags [Array, Binary Search, Divide and Conquer], recentAcSubmissionList (limit 3) → last solve "Median of Two Sorted Arrays" (LC Hard #4), userContestRanking.attendedContestsCount
+- Connected handle: POST /api/platforms {"platform":"leetcode","handle":"sachin0amit"} → stored in PlatformConfig table; profileUrl auto-synthesizes to https://leetcode.com/u/sachin0amit
+- platform-types.ts: added LeetCodeRecentSolve interface; LeetCodeStats += contestsAttended, recentSolves[], skillTags[]
+- platform-stats.ts: new parse logic — recent solves (unix-sec string → ISO, malformed rows filtered), skill tags (deduped via Map, most-solved-first, top 4), contestsAttended default 0
+- Platforms.tsx LeetCodeBody: unranked sentinel (ranking >= 5000000) now renders "GLOBAL RANK PENDING" instead of the odd "#5,000,001"; null contest rating falls back to "CONTESTS 0"; new SKILL SIGNALS chip row; new RECENT SOLVES feed (▸ title + relative time via hand-rolled relTime: now/m/h/d/mo, each row links to leetcode.com/problems/{slug}, hover highlight); hydration-safe (data arrives via client fetch, no SSR content)
+- Real email wired everywhere the placeholder lived: portfolio-data.ts socials, Contact.tsx EMAIL row, Footer.tsx mailto → sachinamit7144097@gmail.com (GitHub/LinkedIn socials still "#" — handles not yet provided by user)
+- QA (agent-browser + VLM): 0 console errors; LeetCode card LIVE with ring "1 SOLVED", EASY/MEDIUM/HARD bars, GLOBAL RANK PENDING, CONTESTS 0, SKILL SIGNALS chips, RECENT SOLVES "Median of Two Sorted Arrays · 7mo", footer avatar + @sachin0amit + VIEW PROFILE; Codeforces/GitHub cards honest STANDBY (AWAITING UPLINK); RESYNC button clicked end-to-end (spinner fires, card stays LIVE after refetch); contact section shows real email; mobile 390px: scrollW=clientW=390, cards stack, ring+bars side-by-side fit, all text readable; tsc clean, eslint clean, dev.log clean
+
+Stage Summary:
+- LeetCode uplink is LIVE with the user's real account @sachin0amit — honest data (1 hard problem solved: Median of Two Sorted Arrays, unranked global rank shown as PENDING, 0 contests) + skill-topic chips + recent-solves feed, all auto-refreshing every 10 min
+- Real contact email sachinamit7144097@gmail.com live in Contact section, Footer and socials
+- Connect flow proven: to add GitHub/Codeforces later just POST /api/platforms {"platform":"github"|"codeforces","handle":"<user>"}
+
+Unresolved issues / next-phase priorities:
+- AWAITING user's GitHub username + Codeforces handle (send links/handles → I will POST them; cards will flip from AWAITING UPLINK to LIVE automatically)
+- LinkedIn/GitHub social links in Contact/Footer still "#" placeholders
+- GitHub unauthenticated rate limit (60/hr shared IP) — GITHUB_TOKEN env optional if SIGNAL LOST appears
+- Sandbox clock is set months ahead of the solve timestamp (2026-09 vs 2026-01) → relative time shows "7mo" in QA; on real visitor devices it will show the correct relative time

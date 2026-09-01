@@ -371,8 +371,27 @@ function LiveBody({
 }
 
 /* ================= LeetCode ================= */
+
+/** LeetCode stores 5000001 as the "unranked" sentinel for new profiles. */
+const LC_UNRANKED_SENTINEL = 5000000;
+
+function relTime(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "—";
+  const diff = Math.max(0, Date.now() - t);
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "now";
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d}d`;
+  return `${Math.floor(d / 30)}mo`;
+}
+
 function LeetCodeBody({ stats }: { stats: LeetCodeStats }) {
   const pct = Math.min(1, stats.totalSolved / LC_TOTAL_APPROX);
+  const ranked = stats.ranking != null && stats.ranking < LC_UNRANKED_SENTINEL;
   const bars = [
     { label: "EASY", count: stats.easy, cls: "bg-[oklch(0.82_0.22_165)]", text: "text-[oklch(0.82_0.22_165)]" },
     { label: "MEDIUM", count: stats.medium, cls: "bg-[oklch(0.75_0.22_90)]", text: "text-[oklch(0.75_0.22_90)]" },
@@ -440,17 +459,83 @@ function LeetCodeBody({ stats }: { stats: LeetCodeStats }) {
 
       {/* meta row */}
       <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-white/5 pt-3 font-mono text-[8px] tracking-[0.15em] text-muted-foreground">
-        {stats.ranking != null && (
-          <span>
-            GLOBAL RANK <span className="text-[oklch(0.75_0.22_90)]">#{stats.ranking.toLocaleString()}</span>
-          </span>
-        )}
-        {stats.contestRating != null && (
+        <span>
+          GLOBAL RANK{" "}
+          {ranked ? (
+            <span className="text-[oklch(0.75_0.22_90)]">
+              #{stats.ranking?.toLocaleString()}
+            </span>
+          ) : (
+            <span className="text-muted-foreground/60">PENDING</span>
+          )}
+        </span>
+        {stats.contestRating != null ? (
           <span>
             CONTEST <span className="text-[oklch(0.75_0.22_90)]">{stats.contestRating}</span>
           </span>
+        ) : (
+          <span>
+            CONTESTS{" "}
+            <span className="text-muted-foreground/60">
+              {stats.contestsAttended ?? 0}
+            </span>
+          </span>
         )}
       </div>
+
+      {/* skill signals */}
+      {stats.skillTags.length > 0 && (
+        <div className="border-t border-white/5 pt-3">
+          <div className="mb-1.5 font-mono text-[8px] tracking-[0.2em] text-muted-foreground">
+            SKILL SIGNALS
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {stats.skillTags.map((tag) => (
+              <span
+                key={tag}
+                className="rounded-full border border-[oklch(0.82_0.22_165/0.3)] bg-[oklch(0.82_0.22_165/0.08)] px-2.5 py-0.5 font-mono text-[8px] tracking-[0.1em] text-[oklch(0.82_0.22_165)]"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* recent solves feed */}
+      {stats.recentSolves.length > 0 && (
+        <div className="border-t border-white/5 pt-3">
+          <div className="mb-1.5 flex items-center gap-1.5 font-mono text-[8px] tracking-[0.2em] text-muted-foreground">
+            <span className="h-1 w-1 animate-pulse rounded-full bg-[oklch(0.82_0.22_165)]" />
+            RECENT SOLVES
+          </div>
+          <ul className="space-y-1">
+            {stats.recentSolves.map((solve) => (
+              <li key={solve.titleSlug}>
+                <a
+                  href={`https://leetcode.com/problems/${solve.titleSlug}/`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-white/[0.03]"
+                >
+                  <span
+                    aria-hidden
+                    className="font-mono text-[8px] text-[oklch(0.82_0.22_165)]"
+                  >
+                    ▸
+                  </span>
+                  <span className="min-w-0 flex-1 truncate font-mono text-[9px] tracking-[0.08em] text-foreground/75 transition-colors group-hover:text-foreground">
+                    {solve.title}
+                  </span>
+                  <span className="shrink-0 font-mono text-[8px] text-muted-foreground/60">
+                    {relTime(solve.timestamp)}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

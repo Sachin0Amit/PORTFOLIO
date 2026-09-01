@@ -8,6 +8,12 @@ export type PlatformId = "leetcode" | "codeforces" | "github";
 
 export const PLATFORM_IDS: PlatformId[] = ["leetcode", "codeforces", "github"];
 
+export interface LeetCodeRecentSolve {
+  title: string;
+  titleSlug: string;
+  timestamp: string; // ISO string
+}
+
 export interface LeetCodeStats {
   totalSolved: number;
   easy: number;
@@ -15,7 +21,10 @@ export interface LeetCodeStats {
   hard: number;
   ranking: number | null;
   contestRating: number | null;
+  contestsAttended: number | null;
   avatarUrl: string | null;
+  recentSolves: LeetCodeRecentSolve[];
+  skillTags: string[];
 }
 
 export interface CodeforcesStats {

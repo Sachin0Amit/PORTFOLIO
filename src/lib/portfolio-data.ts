@@ -120,7 +120,7 @@ export const PROFILE = {
   socials: [
     { label: "GitHub", href: "#", handle: "@sachinkumar" },
     { label: "LinkedIn", href: "#", handle: "in/sachinkumar" },
-    { label: "Email", href: "mailto:sachin@example.com", handle: "sachin@example.com" },
+    { label: "Email", href: "mailto:sachinamit7144097@gmail.com", handle: "sachinamit7144097@gmail.com" },
   ],
   projects: [
     {
