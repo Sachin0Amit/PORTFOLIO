@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  subject   String   @default("Hello")
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model GuestbookEntry {
+  id        String   @id @default(cuid())
+  name      String
+  message   String
+  country   String   @default("")
+  createdAt DateTime @default(now())
+}
+
+model SiteVisit {
+  id        String   @id @default(cuid())
+  path      String   @default("/")
+  referrer  String   @default("")
+  createdAt DateTime @default(now())
+}
