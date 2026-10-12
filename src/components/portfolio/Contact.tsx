@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Send, Radio, Mail, Github, Linkedin, CheckCircle2 } from "lucide-react";
 import { PROFILE } from "@/lib/portfolio-data";
 import { SectionHeading } from "./SectionHeading";
@@ -21,6 +21,13 @@ export function Contact() {
     frequency: "EARTH",
     message: "",
   });
+  const sentTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (sentTimer.current) clearTimeout(sentTimer.current);
+    };
+  }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +61,8 @@ export function Contact() {
       });
     } finally {
       setSending(false);
-      setTimeout(() => setSent(false), 4000);
+      if (sentTimer.current) clearTimeout(sentTimer.current);
+      sentTimer.current = setTimeout(() => setSent(false), 4000);
     }
   };
 
@@ -118,8 +126,8 @@ export function Contact() {
                 {
                   icon: Github,
                   label: "GITHUB",
-                  value: "@sachinkumar",
-                  href: "#",
+                  value: "@Sachin0Amit",
+                  href: "https://github.com/Sachin0Amit",
                   color: "cyan",
                 },
                 {
@@ -194,10 +202,11 @@ export function Contact() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <label className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
+                  <label htmlFor="sender-name" className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
                     SENDER NAME *
                   </label>
                   <Input
+                    id="sender-name"
                     value={form.name}
                     onChange={(e) =>
                       setForm({ ...form, name: e.target.value })
@@ -207,10 +216,11 @@ export function Contact() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
+                  <label htmlFor="sender-email" className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
                     RETURN FREQUENCY *
                   </label>
                   <Input
+                    id="sender-email"
                     type="email"
                     value={form.email}
                     onChange={(e) =>
@@ -223,10 +233,11 @@ export function Contact() {
               </div>
 
               <div className="mt-4 space-y-1.5">
-                <label className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
+                <label htmlFor="message-payload" className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
                   MESSAGE PAYLOAD *
                 </label>
                 <Textarea
+                  id="message-payload"
                   value={form.message}
                   onChange={(e) =>
                     setForm({ ...form, message: e.target.value })

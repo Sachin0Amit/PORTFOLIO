@@ -1,19 +1,34 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { requireAdminKey } from "@/lib/admin-auth";
+import {
+  bodyErrorResponse,
+  rateLimitedResponse,
+  readJsonBody,
+} from "@/lib/api-utils";
+import { TestimonialSchema, firstIssue } from "@/lib/api-schemas";
 
-interface TestimonialPayload {
-  author?: string;
-  role?: string;
-  relation?: string;
-  quote?: string;
-  rating?: number;
-  accent?: string;
-  verifyLink?: string;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Allowlist for the user-supplied verification link. Accepts http(s) URLs
+ * and plain email addresses only — rejects `javascript:`, `data:` and any
+ * other scheme so the stored value is safe to render as an href.
+ */
+export function sanitizeVerifyLink(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const v = raw.trim().slice(0, 300);
+  if (!v) return null;
+  if (EMAIL_RE.test(v)) return v;
+  try {
+    const u = new URL(v);
+    if (u.protocol === "http:" || u.protocol === "https:") return u.toString();
+  } catch {
+    // not an absolute URL
+  }
+  return null;
 }
-
-const ACCENTS = new Set(["alien", "cyan", "plasma"]);
-const MAX_QUOTE = 600;
-const MAX_FIELD = 120;
 
 /**
  * GET /api/testimonials — returns all approved testimonials, newest first.
@@ -54,55 +69,33 @@ export async function GET() {
 
 /**
  * POST /api/testimonials — submit a new testimonial. Auto-approved so it
- * appears immediately (admin can flip approved=false later to hide).
+ * appears immediately (admin can hide via DELETE below).
  */
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as TestimonialPayload;
+    if (!checkRateLimit(req, "testimonials", { limit: 5, windowMs: 60_000 })) {
+      return rateLimitedResponse("Too many broadcasts — retry in a minute");
+    }
 
-    // Validate required fields
-    if (!body.author || !body.role || !body.quote) {
+    const parsed = TestimonialSchema.safeParse(await readJsonBody(req));
+    if (!parsed.success) {
       return NextResponse.json(
-        {
-          ok: false,
-          error: "Missing required fields: author, role, quote",
-        },
+        { ok: false, error: firstIssue(parsed) },
         { status: 400 }
       );
     }
-
-    const author = body.author.trim().slice(0, MAX_FIELD);
-    const role = body.role.trim().slice(0, MAX_FIELD);
-    const relation = (body.relation ?? "Visitor").trim().slice(0, MAX_FIELD);
-    const quote = body.quote.trim().slice(0, MAX_QUOTE);
-    const rating = Math.min(5, Math.max(1, Number(body.rating) || 5));
-    const accent = ACCENTS.has(body.accent ?? "")
-      ? (body.accent as string)
-      : "alien";
-    const verifyLink = body.verifyLink?.trim().slice(0, 300) || null;
-
-    if (author.length < 2) {
-      return NextResponse.json(
-        { ok: false, error: "Name must be at least 2 characters" },
-        { status: 400 }
-      );
-    }
-    if (quote.length < 10) {
-      return NextResponse.json(
-        { ok: false, error: "Testimonial must be at least 10 characters" },
-        { status: 400 }
-      );
-    }
+    const { author, role, relation, quote, rating, accent, verifyLink } =
+      parsed.data;
 
     const record = await db.testimonial.create({
       data: {
         author,
         role,
-        relation,
+        relation: relation || "Visitor",
         quote,
         rating,
         accent,
-        verifyLink,
+        verifyLink: sanitizeVerifyLink(verifyLink),
         approved: true,
       },
     });
@@ -115,9 +108,56 @@ export async function POST(req: Request) {
       message: "Testimonial broadcast successfully.",
     });
   } catch (err) {
+    const bodyErr = bodyErrorResponse(err);
+    if (bodyErr) return bodyErr;
     console.error("[TESTIMONIALS] POST failed:", err);
     return NextResponse.json(
       { ok: false, error: "Failed to broadcast testimonial" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/testimonials?id=… — hide a testimonial (soft moderation:
+ * sets approved=false). Admin key required.
+ */
+export async function DELETE(req: Request) {
+  try {
+    const denied = requireAdminKey(req);
+    if (denied) return denied;
+    if (!checkRateLimit(req, "testimonials-admin", { limit: 60, windowMs: 60_000 })) {
+      return rateLimitedResponse();
+    }
+
+    const id = new URL(req.url).searchParams.get("id")?.trim() ?? "";
+    if (!id || id.length > 64) {
+      return NextResponse.json(
+        { ok: false, error: "id query param required" },
+        { status: 400 }
+      );
+    }
+
+    await db.testimonial.update({
+      where: { id },
+      data: { approved: false },
+    });
+    return NextResponse.json({ ok: true, id, approved: false });
+  } catch (err) {
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      (err as { code?: string }).code === "P2025"
+    ) {
+      return NextResponse.json(
+        { ok: false, error: "Testimonial not found" },
+        { status: 404 }
+      );
+    }
+    console.error("[TESTIMONIALS] DELETE failed:", err);
+    return NextResponse.json(
+      { ok: false, error: "Failed to hide testimonial" },
       { status: 500 }
     );
   }

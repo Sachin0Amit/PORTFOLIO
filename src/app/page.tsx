@@ -9,7 +9,6 @@ import { BackToTop } from "@/components/effects/BackToTop";
 import { SoundToggle } from "@/components/effects/SoundToggle";
 import { SoundBindings } from "@/components/effects/SoundBindings";
 import { ShortcutsHelp } from "@/components/effects/ShortcutsHelp";
-import { SectionRail } from "@/components/effects/SectionRail";
 import { Navbar } from "@/components/portfolio/Navbar";
 import { Hero } from "@/components/portfolio/Hero";
 import { About } from "@/components/portfolio/About";
@@ -40,7 +39,6 @@ export default function Home() {
       <ScrollProgress />
       <AlienCursor />
       <Navbar />
-      <SectionRail />
       <CommandPalette />
       <KonamiEasterEgg />
       <ShortcutsHelp />

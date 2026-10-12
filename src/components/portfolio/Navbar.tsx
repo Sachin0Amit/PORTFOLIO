@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Radio, Search, Keyboard } from "lucide-react";
 
@@ -17,11 +17,32 @@ const LINKS = [
   { label: "SIGNAL", href: "#contact" },
 ];
 
+const istFormatter = new Intl.DateTimeFormat("en-GB", {
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+  timeZone: "Asia/Kolkata",
+});
+
+/**
+ * Live IST clock, isolated in a memoized component so the 1s tick only
+ * re-renders this span — not the whole navbar. Uses Asia/Kolkata so the
+ * "IST" label is correct for visitors in any timezone.
+ */
+const Clock = memo(function Clock() {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <>{istFormatter.format(now)} IST</>;
+});
+
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState("hero");
-  const [time, setTime] = useState("");
 
   const triggerCmdK = () => {
     // The CommandPalette listens for Cmd/Ctrl+K — synthesize it
@@ -35,19 +56,6 @@ export function Navbar() {
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  useEffect(() => {
-    const update = () => {
-      const d = new Date();
-      const hh = String(d.getHours()).padStart(2, "0");
-      const mm = String(d.getMinutes()).padStart(2, "0");
-      const ss = String(d.getSeconds()).padStart(2, "0");
-      setTime(`${hh}:${mm}:${ss}`);
-    };
-    update();
-    const id = setInterval(update, 1000);
-    return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
@@ -76,99 +84,105 @@ export function Navbar() {
         className="fixed inset-x-0 top-0 z-50 flex justify-center px-3 pt-3 sm:px-4 sm:pt-4"
       >
         <nav
-          className={`flex w-full max-w-5xl items-center justify-between gap-3 rounded-2xl px-3 py-2.5 transition-all duration-300 sm:px-4 ${
+          className={`flex w-full max-w-7xl min-w-0 items-center gap-2 rounded-2xl px-3 py-2 transition-all duration-300 sm:px-4 isolate ${
             scrolled
-              ? "glass-panel holo-border shadow-[0_8px_40px_-12px_rgba(120,255,200,0.25)]"
+              ? "bg-[oklch(0.06_0.02_280/0.8)] backdrop-blur-xl border border-[oklch(0.82_0.22_165/0.12)] shadow-lg shadow-black/50"
               : "border border-transparent bg-transparent"
           }`}
         >
           {/* Brand */}
-          <a href="#hero" className="group flex items-center gap-2.5">
+          <a href="#hero" className="group flex flex-none items-center gap-2.5">
             <span className="relative flex h-8 w-8 items-center justify-center">
               <span className="absolute inset-0 rounded-full bg-[oklch(0.82_0.22_165/0.15)] blur-md transition-all group-hover:bg-[oklch(0.82_0.22_165/0.3)]" />
               <span className="relative flex h-8 w-8 items-center justify-center rounded-full border border-[oklch(0.82_0.22_165/0.5)] bg-[oklch(0.10_0.02_280)]">
                 <Radio className="h-4 w-4 text-[oklch(0.82_0.22_165)] animate-flicker" />
               </span>
             </span>
-            <div className="hidden flex-col leading-none sm:flex">
+            <div className="hidden flex-col leading-tight sm:flex">
               <span className="font-display text-xs font-bold tracking-[0.2em] text-foreground">
                 SACHIN<span className="text-[oklch(0.82_0.22_165)]">.</span>K
               </span>
-              <span className="font-mono text-[9px] tracking-[0.3em] text-muted-foreground">
-                {time || "00:00:00"} IST
+              <span className="font-mono text-[9px] tracking-[0.25em] text-muted-foreground whitespace-nowrap">
+                <Clock />
               </span>
             </div>
           </a>
 
-          {/* Desktop links */}
-          <div className="hidden items-center gap-0.5 xl:flex">
-            {LINKS.map((l) => (
-              <a
-                key={l.href}
-                href={l.href}
-                className={`relative rounded-lg px-2 py-1.5 font-mono text-[10px] font-medium tracking-[0.12em] transition-colors ${
-                  active === l.href.replace("#", "")
-                    ? "text-[oklch(0.82_0.22_165)]"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {l.label}
-                {active === l.href.replace("#", "") && (
-                  <motion.span
-                    layoutId="nav-active"
-                    className="absolute inset-0 -z-10 rounded-lg bg-[oklch(0.82_0.22_165/0.12)] ring-1 ring-[oklch(0.82_0.22_165/0.3)]"
-                    transition={{ type: "spring", stiffness: 400, damping: 32 }}
-                  />
-                )}
-              </a>
-            ))}
+          {/* Desktop links — flexible center, internal scroll instead of overlapping controls */}
+          <div className="hidden min-w-0 flex-1 items-center justify-center gap-0.5 overflow-x-auto xl:flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {LINKS.map((l) => {
+              const isActive = active === l.href.replace("#", "");
+              return (
+                <a
+                  key={l.href}
+                  href={l.href}
+                  className={`relative inline-flex flex-none items-center justify-center rounded-lg px-2 py-1.5 font-mono text-[10px] font-medium tracking-[0.1em] leading-none transition-colors 2xl:px-2.5 2xl:text-[11px] ${
+                    isActive
+                      ? "text-[oklch(0.82_0.22_165)] font-semibold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <span className="relative z-10 whitespace-nowrap">{l.label}</span>
+                  {isActive && (
+                    <motion.span
+                      layoutId="nav-active"
+                      className="pointer-events-none absolute inset-0 rounded-lg border border-[oklch(0.82_0.22_165/0.35)] bg-[oklch(0.82_0.22_165/0.10)]"
+                      transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                    />
+                  )}
+                </a>
+              );
+            })}
           </div>
 
-          {/* Command palette trigger */}
-          <button
-            onClick={triggerCmdK}
-            className="group hidden items-center gap-2 rounded-lg border border-[oklch(0.82_0.22_165/0.25)] bg-[oklch(0.10_0.02_280/0.6)] px-2.5 py-1.5 transition-all hover:border-[oklch(0.82_0.22_165/0.5)] md:flex"
-            aria-label="Open command palette"
-          >
-            <Search className="h-3.5 w-3.5 text-[oklch(0.82_0.22_165)]" />
-            <span className="font-mono text-[9px] tracking-[0.2em] text-muted-foreground">
-              SEARCH
-            </span>
-            <kbd className="rounded border border-[oklch(0.82_0.22_165/0.2)] bg-[oklch(0.10_0.02_280/0.5)] px-1 py-0.5 font-mono text-[8px] text-muted-foreground">
-              ⌘K
-            </kbd>
-          </button>
+          {/* Right controls */}
+          <div className="ml-auto flex flex-none items-center gap-2">
+            {/* Command palette trigger */}
+            <button
+              onClick={triggerCmdK}
+              className="group hidden shrink-0 items-center gap-2 rounded-lg border border-[oklch(0.82_0.22_165/0.25)] bg-[oklch(0.10_0.02_280/0.6)] px-2.5 py-1.5 transition-all hover:border-[oklch(0.82_0.22_165/0.5)] md:flex"
+              aria-label="Open command palette"
+            >
+              <Search className="h-3.5 w-3.5 shrink-0 text-[oklch(0.82_0.22_165)]" />
+              <span className="hidden whitespace-nowrap font-mono text-[9px] tracking-[0.2em] text-muted-foreground leading-none 2xl:inline">
+                SEARCH
+              </span>
+              <kbd className="shrink-0 rounded border border-[oklch(0.82_0.22_165/0.3)] bg-[oklch(0.10_0.02_280/0.5)] px-1.5 py-0.5 font-mono text-[9px] leading-none text-muted-foreground">
+                ⌘K
+              </kbd>
+            </button>
 
-          {/* Shortcuts help trigger */}
-          <button
-            onClick={() => {
-              window.dispatchEvent(new KeyboardEvent("keydown", { key: "?", bubbles: true }));
-            }}
-            className="group hidden h-8 w-8 items-center justify-center rounded-lg border border-[oklch(0.82_0.22_165/0.25)] bg-[oklch(0.10_0.02_280/0.6)] transition-all hover:border-[oklch(0.82_0.22_165/0.5)] md:flex"
-            aria-label="Keyboard shortcuts"
-          >
-            <Keyboard className="h-3.5 w-3.5 text-[oklch(0.78_0.20_195)] transition-transform group-hover:scale-110" />
-          </button>
+            {/* Shortcuts help trigger */}
+            <button
+              onClick={() => {
+                window.dispatchEvent(new KeyboardEvent("keydown", { key: "?", bubbles: true }));
+              }}
+              className="group hidden shrink-0 h-8 w-8 items-center justify-center rounded-lg border border-[oklch(0.82_0.22_165/0.25)] bg-[oklch(0.10_0.02_280/0.6)] transition-all hover:border-[oklch(0.82_0.22_165/0.5)] md:flex"
+              aria-label="Keyboard shortcuts"
+            >
+              <Keyboard className="h-3.5 w-3.5 text-[oklch(0.78_0.20_195)] transition-transform group-hover:scale-110" />
+            </button>
 
-          {/* Status pill */}
-          <div className="hidden items-center gap-2 rounded-full border border-[oklch(0.82_0.22_165/0.3)] bg-[oklch(0.10_0.02_280/0.6)] px-3 py-1 xl:flex">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[oklch(0.82_0.22_165)] opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-[oklch(0.82_0.22_165)]" />
-            </span>
-            <span className="font-mono text-[9px] font-medium tracking-[0.2em] text-muted-foreground">
-              SIGNAL ACTIVE
-            </span>
+            {/* Status pill — only on very wide screens so it never overlaps links/active pill */}
+            <div className="hidden shrink-0 items-center gap-2 rounded-full border border-[oklch(0.82_0.22_165/0.3)] bg-[oklch(0.10_0.02_280/0.6)] px-3.5 py-1.5 2xl:flex">
+              <span className="relative flex h-2 w-2 shrink-0">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[oklch(0.82_0.22_165)] opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-[oklch(0.82_0.22_165)]" />
+              </span>
+              <span className="whitespace-nowrap font-mono text-[9px] font-medium tracking-[0.18em] text-muted-foreground leading-none">
+                SIGNAL ACTIVE
+              </span>
+            </div>
+
+            {/* Mobile toggle */}
+            <button
+              onClick={() => setOpen((v) => !v)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[oklch(0.82_0.22_165/0.3)] bg-[oklch(0.10_0.02_280/0.6)] text-[oklch(0.82_0.22_165)] xl:hidden"
+              aria-label="Toggle navigation"
+            >
+              {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            </button>
           </div>
-
-          {/* Mobile toggle */}
-          <button
-            onClick={() => setOpen((v) => !v)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-[oklch(0.82_0.22_165/0.3)] bg-[oklch(0.10_0.02_280/0.6)] text-[oklch(0.82_0.22_165)] xl:hidden"
-            aria-label="Toggle navigation"
-          >
-            {open ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-          </button>
         </nav>
       </motion.header>
 

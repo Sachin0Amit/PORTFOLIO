@@ -55,6 +55,8 @@ export interface CodeforcesStats {
   ratingHistory: CodeforcesHistoryPoint[];
   /** Total contests ever attended (null = history unavailable). */
   contestsCount: number | null;
+  /** Distinct accepted problems from recent submissions (null = unavailable). */
+  problemsSolved: number | null;
 }
 
 export interface GitHubStats {

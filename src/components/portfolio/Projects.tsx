@@ -35,7 +35,10 @@ const accentMap = {
 void Cloud;
 
 export function Projects() {
-  const [featured, ...rest] = PROFILE.projects;
+  const projects = PROFILE.projects;
+  const hasProjects = projects.length > 0;
+  const featured = hasProjects ? projects[0] : null;
+  const rest = hasProjects ? projects.slice(1) : [];
   const [selected, setSelected] = useState<Project | null>(null);
 
   return (
@@ -46,20 +49,68 @@ export function Projects() {
         <SectionHeading
           index="08 // ARCHIVE"
           title="PROJECT ARCHIVE"
-          subtitle="Selected builds from the engineering bay — each one a transmission from the workshop."
+          subtitle={
+            hasProjects
+              ? "Selected builds from the engineering bay — each one a transmission from the workshop."
+              : "Engineering bay standby — real-world builds currently under construction."
+          }
           accent="cyan"
         />
 
-        <div className="grid gap-5 lg:grid-cols-2">
-          {/* Featured project — large card */}
+        {!hasProjects ? (
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-60px" }}
-            transition={{ duration: 0.6 }}
-            className="lg:row-span-2"
+            transition={{ duration: 0.5 }}
+            className="relative flex flex-col items-center justify-center overflow-hidden rounded-2xl glass-panel p-8 sm:p-14 text-center border border-[oklch(0.78_0.20_195/0.2)]"
           >
-            <TiltCard max={8} scale={1.03} glareColor={featured.accent} className="h-full">
+            <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[oklch(0.78_0.20_195/0.08)] blur-3xl" />
+            <div className="pointer-events-none absolute -left-16 -bottom-16 h-48 w-48 rounded-full bg-[oklch(0.82_0.22_165/0.06)] blur-3xl" />
+
+            <div className="relative flex flex-col items-center max-w-lg">
+              <span className="relative mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-[oklch(0.78_0.20_195/0.3)] bg-[oklch(0.78_0.20_195/0.1)]">
+                <span className="absolute -inset-1 animate-ping rounded-2xl border border-[oklch(0.78_0.20_195/0.2)] opacity-30" />
+                <FolderGit2 className="h-6 w-6 text-[oklch(0.78_0.20_195)]" />
+              </span>
+
+              <span className="mb-3 inline-flex items-center gap-2 rounded-full border border-[oklch(0.78_0.20_195/0.3)] bg-[oklch(0.10_0.02_280/0.6)] px-3 py-1 font-mono text-[10px] tracking-[0.2em] text-[oklch(0.78_0.20_195)]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[oklch(0.78_0.20_195)] animate-pulse" />
+                ARCHIVE STANDBY // FREQUENCY CLEAR
+              </span>
+
+              <h3 className="font-display text-2xl font-black tracking-wide sm:text-3xl">
+                NO TRANSMISSIONS YET
+              </h3>
+
+              <p className="mt-3 text-sm leading-relaxed text-foreground/70">
+                The archive is currently empty. Real-world engineering projects and production systems are actively being forged in the workshop.
+              </p>
+
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5 font-mono text-[11px] text-muted-foreground">
+                <span className="rounded-lg border border-[oklch(0.82_0.22_165/0.2)] bg-[oklch(0.10_0.02_280/0.5)] px-3 py-1.5">
+                  <span className="text-[oklch(0.82_0.22_165)]">STATUS:</span> CALIBRATING
+                </span>
+                <span className="rounded-lg border border-[oklch(0.78_0.20_195/0.2)] bg-[oklch(0.10_0.02_280/0.5)] px-3 py-1.5">
+                  <span className="text-[oklch(0.78_0.20_195)]">BUILDS:</span> 0 ACTIVE
+                </span>
+                <span className="rounded-lg border border-[oklch(0.72_0.25_320/0.2)] bg-[oklch(0.10_0.02_280/0.5)] px-3 py-1.5">
+                  <span className="text-[oklch(0.72_0.25_320)]">TARGET:</span> REAL-WORLD BUILDS
+                </span>
+              </div>
+            </div>
+          </motion.div>
+        ) : featured ? (
+          <div className="grid gap-5 lg:grid-cols-2">
+            {/* Featured project — large card */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.6 }}
+              className="lg:row-span-2"
+            >
+              <TiltCard max={8} scale={1.03} glareColor={featured.accent} className="h-full">
               <div className="group relative flex h-full flex-col overflow-hidden rounded-2xl glass-panel p-6 sm:p-8">
                 <div className="relative flex h-full flex-col">
                   {/* Header */}
@@ -247,6 +298,7 @@ export function Projects() {
             );
           })}
         </div>
+        ) : null}
       </div>
 
       {/* Project detail modal */}

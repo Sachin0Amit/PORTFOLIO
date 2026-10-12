@@ -2,7 +2,7 @@
 
 import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
-import { ArrowDown, Cpu, Globe2, Sparkles } from "lucide-react";
+import { ArrowDown, Cpu, Globe2 } from "lucide-react";
 import { PROFILE } from "@/lib/portfolio-data";
 import { TiltCard } from "@/components/effects/TiltCard";
 
@@ -43,19 +43,6 @@ export function Hero() {
         style={{ y: yContent, opacity }}
         className="relative z-10 mx-auto flex max-w-4xl flex-col items-center text-center"
       >
-        {/* Top badge */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="mb-6 flex items-center gap-2 rounded-full border border-[oklch(0.82_0.22_165/0.3)] bg-[oklch(0.10_0.02_280/0.6)] px-4 py-1.5 backdrop-blur-md"
-        >
-          <Sparkles className="h-3.5 w-3.5 text-[oklch(0.82_0.22_165)]" />
-          <span className="font-mono text-[10px] tracking-[0.25em] text-muted-foreground">
-            TRANSMISSION FROM {PROFILE.originCodename}
-          </span>
-        </motion.div>
-
         {/* Callsign */}
         <motion.p
           initial={{ opacity: 0 }}

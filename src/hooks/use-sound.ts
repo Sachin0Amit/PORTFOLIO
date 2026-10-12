@@ -113,9 +113,11 @@ export function useSound() {
   }, []);
 
   const toggle = useCallback(() => {
-    setEnabled(!enabled);
-    // Play a confirmation blip when enabling
-    if (!enabled) {
+    const next = !enabled;
+    setEnabled(next);
+    // Play a confirmation blip when enabling (module `enabled` is already
+    // updated by setEnabled above, so branch on the local `next` value).
+    if (next) {
       window.setTimeout(() => playSound("click"), 20);
     }
   }, []);

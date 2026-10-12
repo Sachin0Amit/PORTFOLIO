@@ -33,9 +33,23 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>();
 
+/** In-flight fetches, keyed like the cache — concurrent cold-cache
+ * requests share one upstream call instead of stampeding it. */
+const inflight = new Map<string, Promise<FetchResult<never>>>();
+
 export function clearPlatformCache(platform?: PlatformId) {
-  if (platform) cache.delete(platform);
-  else cache.clear();
+  if (platform) {
+    const prefix = `${platform}:`;
+    for (const key of [...cache.keys()]) {
+      if (key === platform || key.startsWith(prefix)) cache.delete(key);
+    }
+    for (const key of [...inflight.keys()]) {
+      if (key === platform || key.startsWith(prefix)) inflight.delete(key);
+    }
+  } else {
+    cache.clear();
+    inflight.clear();
+  }
 }
 
 async function fetchJson(
@@ -93,18 +107,28 @@ async function withCache<T>(key: string, fetcher: () => Promise<FetchResult<T>>)
       ? { ok: true, stats: hit.value.stats }
       : { ok: false, error: hit.value.error ?? "UNKNOWN" }) as FetchResult<T>;
   }
-  const value = await fetcher();
-  cache.set(key, {
-    expiresAt:
-      Date.now() +
-      (value.ok
-        ? value.ttlMs ?? SUCCESS_TTL_MS
-        : value.ttlMs ?? FAILURE_TTL_MS),
-    value: value.ok
-      ? { ok: true, stats: value.stats }
-      : { ok: false, error: value.error },
-  });
-  return value;
+  const running = inflight.get(key);
+  if (running) return running as Promise<FetchResult<T>>;
+  const task = (async () => {
+    try {
+      const value = await fetcher();
+      cache.set(key, {
+        expiresAt:
+          Date.now() +
+          (value.ok
+            ? value.ttlMs ?? SUCCESS_TTL_MS
+            : value.ttlMs ?? FAILURE_TTL_MS),
+        value: value.ok
+          ? { ok: true, stats: value.stats }
+          : { ok: false, error: value.error },
+      });
+      return value;
+    } finally {
+      inflight.delete(key);
+    }
+  })();
+  inflight.set(key, task as Promise<FetchResult<never>>);
+  return task;
 }
 
 /* ================= LeetCode ================= */
@@ -181,7 +205,8 @@ function parseLcCalendar(raw: string | undefined): DayCount[] {
 }
 
 export function fetchLeetCode(handle: string): Promise<FetchResult<LeetCodeStats>> {
-  return withCache("leetcode", async () => {
+  // Key includes the handle so a handle change never serves another user's data.
+  return withCache(`leetcode:${handle.trim().toLowerCase()}`, async () => {
     const res = await fetchJson("https://leetcode.com/graphql", {
       method: "POST",
       headers: {
@@ -207,19 +232,24 @@ export function fetchLeetCode(handle: string): Promise<FetchResult<LeetCodeStats
       else if (row.difficulty === "All") counts.total = row.count ?? 0;
     }
 
-    // Recent accepted submissions → problem feed (skip malformed rows)
+    // Recent accepted submissions → problem feed (skip malformed rows;
+    // a bad timestamp must never throw and take down the whole card)
     const recentSolves = (json.data?.recentAcSubmissionList ?? [])
-      .filter(
-        (s): s is { title: string; titleSlug: string; timestamp: string } =>
-          Boolean(s.title && s.titleSlug && s.timestamp)
-      )
-      .slice(0, 3)
-      .map((s) => ({
-        title: s.title,
-        titleSlug: s.titleSlug,
+      .flatMap((s) => {
         // LeetCode returns unix seconds as a string
-        timestamp: new Date(Number(s.timestamp) * 1000).toISOString(),
-      }));
+        const ts = Number(s.timestamp);
+        if (!s.title || !s.titleSlug || !Number.isFinite(ts) || ts <= 0) {
+          return [];
+        }
+        return [
+          {
+            title: s.title,
+            titleSlug: s.titleSlug,
+            timestamp: new Date(ts * 1000).toISOString(),
+          },
+        ];
+      })
+      .slice(0, 3);
 
     // Skill tags from solved-problem topic counts (dedup, most-solved first)
     const tagMap = new Map<string, number>();
@@ -297,8 +327,46 @@ interface CfRatingResponse {
 
 const CF_HISTORY_CAP = 30;
 
+interface CfSubmission {
+  contestId?: number;
+  verdict?: string;
+  problem?: { contestId?: number; index?: string };
+}
+
+interface CfStatusResponse {
+  status?: string;
+  result?: CfSubmission[];
+}
+
+/** Cap on submissions scanned per refresh (most recent first). */
+const CF_SUBMISSIONS_SCAN = 1000;
+
+/**
+ * Distinct accepted problems from the user's recent submissions.
+ * Codeforces exposes no solved-count field, so this scans the most
+ * recent submissions and counts unique contest problems with an OK
+ * verdict. Returns null when the feed is unavailable.
+ */
+async function fetchCfSolvedCount(handle: string): Promise<number | null> {
+  const res = await fetchJson(
+    `https://codeforces.com/api/user.status?handle=${encodeURIComponent(handle)}&from=1&count=${CF_SUBMISSIONS_SCAN}`
+  );
+  if (!res.ok) return null;
+  const submissions = (res.data as CfStatusResponse).result;
+  if (!Array.isArray(submissions)) return null;
+  const solved = new Set<string>();
+  for (const s of submissions) {
+    if (s.verdict !== "OK") continue;
+    const cid = s.problem?.contestId ?? s.contestId;
+    const idx = s.problem?.index;
+    if (cid == null || !idx) continue;
+    solved.add(`${cid}-${idx}`);
+  }
+  return solved.size;
+}
+
 export function fetchCodeforces(handle: string): Promise<FetchResult<CodeforcesStats>> {
-  return withCache("codeforces", async () => {
+  return withCache(`codeforces:${handle.trim().toLowerCase()}`, async () => {
     const res = await fetchJson(
       `https://codeforces.com/api/user.info?handles=${encodeURIComponent(handle)}`
     );
@@ -310,9 +378,12 @@ export function fetchCodeforces(handle: string): Promise<FetchResult<CodeforcesS
     // Rating trajectory (optional — profile stays live if history unavailable)
     let ratingHistory: CodeforcesStats["ratingHistory"] = [];
     let contestsCount: number | null = null;
-    const histRes = await fetchJson(
-      `https://codeforces.com/api/user.rating?handle=${encodeURIComponent(handle)}`
-    );
+    const [histRes, problemsSolved] = await Promise.all([
+      fetchJson(
+        `https://codeforces.com/api/user.rating?handle=${encodeURIComponent(handle)}`
+      ),
+      fetchCfSolvedCount(handle),
+    ]);
     if (histRes.ok) {
       const entries = (histRes.data as CfRatingResponse).result ?? [];
       contestsCount = entries.length;
@@ -335,6 +406,7 @@ export function fetchCodeforces(handle: string): Promise<FetchResult<CodeforcesS
       avatarUrl: user.avatar ?? user.titlePhoto ?? null,
       ratingHistory,
       contestsCount,
+      problemsSolved,
     };
     return { ok: true, stats };
   });
@@ -477,7 +549,7 @@ async function fetchGhHtml(
 }
 
 export function fetchGitHub(handle: string): Promise<FetchResult<GitHubStats>> {
-  return withCache("github", async () => {
+  return withCache(`github:${handle.trim().toLowerCase()}`, async () => {
     const enc = encodeURIComponent(handle);
     // API profile, API repos and the HTML contribution grid are independent —
     // fetch them in parallel so one slow upstream never blocks the card.

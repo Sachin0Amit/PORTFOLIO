@@ -50,8 +50,9 @@
 }
 
 :root {
+  color-scheme: dark;
   --radius: 0.625rem;
-  /* Alien dark theme — default is dark */
+  /* Alien dark theme */
   --background: oklch(0.07 0.02 280);
   --foreground: oklch(0.96 0.01 200);
   --card: oklch(0.10 0.025 280);
@@ -91,6 +92,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.07 0.02 280);
   --foreground: oklch(0.96 0.01 200);
   --card: oklch(0.10 0.025 280);

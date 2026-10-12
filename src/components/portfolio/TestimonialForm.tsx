@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, Star, ShieldCheck, Loader2, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -37,6 +37,21 @@ export function TestimonialForm({ onSubmitted }: TestimonialFormProps) {
     quote: "",
     verifyLink: "",
   });
+
+  // Escape-to-close + background scroll lock while the modal is open.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,6 +134,9 @@ export function TestimonialForm({ onSubmitted }: TestimonialFormProps) {
 
             {/* Panel */}
             <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Leave a testimonial"
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -167,10 +185,11 @@ export function TestimonialForm({ onSubmitted }: TestimonialFormProps) {
 
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <label className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
+                    <label htmlFor="t-author" className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
                       YOUR NAME *
                     </label>
                     <Input
+                      id="t-author"
                       value={form.author}
                       onChange={(e) => setForm({ ...form, author: e.target.value })}
                       placeholder="e.g. Rakesh Deka"
@@ -179,10 +198,11 @@ export function TestimonialForm({ onSubmitted }: TestimonialFormProps) {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
+                    <label htmlFor="t-role" className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
                       WHAT YOU DO *
                     </label>
                     <Input
+                      id="t-role"
                       value={form.role}
                       onChange={(e) => setForm({ ...form, role: e.target.value })}
                       placeholder="e.g. Faculty Mentor"
@@ -194,10 +214,11 @@ export function TestimonialForm({ onSubmitted }: TestimonialFormProps) {
 
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <label className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
+                    <label htmlFor="t-relation" className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
                       RELATION TO SACHIN
                     </label>
                     <Input
+                      id="t-relation"
                       value={form.relation}
                       onChange={(e) => setForm({ ...form, relation: e.target.value })}
                       placeholder="e.g. Senior Batchmate"
@@ -206,10 +227,11 @@ export function TestimonialForm({ onSubmitted }: TestimonialFormProps) {
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
+                    <label htmlFor="t-verify" className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
                       VERIFY LINK (OPTIONAL)
                     </label>
                     <Input
+                      id="t-verify"
                       value={form.verifyLink}
                       onChange={(e) => setForm({ ...form, verifyLink: e.target.value })}
                       placeholder="LinkedIn / email / URL"
@@ -269,10 +291,11 @@ export function TestimonialForm({ onSubmitted }: TestimonialFormProps) {
 
                 {/* Quote */}
                 <div className="mt-3 space-y-1.5">
-                  <label className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
+                  <label htmlFor="t-quote" className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">
                     YOUR TESTIMONIAL *
                   </label>
                   <Textarea
+                    id="t-quote"
                     value={form.quote}
                     onChange={(e) => setForm({ ...form, quote: e.target.value })}
                     placeholder="Share your experience working with Sachin..."

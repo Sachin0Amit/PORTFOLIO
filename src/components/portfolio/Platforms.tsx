@@ -128,7 +128,7 @@ export function Platforms() {
       {/* Ambient glow */}
       <div className="pointer-events-none absolute right-1/4 top-16 h-64 w-72 rounded-full bg-[oklch(0.78_0.20_195/0.05)] blur-3xl" />
 
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-7xl">
         <SectionHeading
           index="07 // UPLINK"
           title="CODING UPLINK"
@@ -136,7 +136,7 @@ export function Platforms() {
           accent="cyan"
         />
 
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
           {ORDER.map((id, i) => (
             <PlatformCard
               key={id}
@@ -153,10 +153,10 @@ export function Platforms() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[oklch(0.82_0.22_165/0.15)] bg-[oklch(0.09_0.02_280/85)] px-4 py-2.5 backdrop-blur-md"
+          className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[oklch(0.82_0.22_165/0.15)] bg-[oklch(0.09_0.02_280/85)] px-5 py-3 backdrop-blur-md"
         >
-          <div className="flex items-center gap-2 font-mono text-[9px] tracking-[0.2em] text-muted-foreground">
-            <Radio className="h-3 w-3 text-[oklch(0.82_0.22_165)]" />
+          <div className="flex items-center gap-2 font-mono text-xs tracking-[0.15em] text-muted-foreground">
+            <Radio className="h-4 w-4 text-[oklch(0.82_0.22_165)]" />
             <span>
               UPLINKS {connectedCount}/3 ACTIVE · LAST SYNC {syncTime} · AUTO 10M
             </span>
@@ -169,11 +169,11 @@ export function Platforms() {
           <button
             onClick={() => load(true)}
             disabled={refreshing}
-            className="flex items-center gap-1.5 rounded-lg border border-[oklch(0.82_0.22_165/0.3)] bg-[oklch(0.10_0.02_280/0.6)] px-2.5 py-1.5 font-mono text-[9px] tracking-[0.2em] text-[oklch(0.82_0.22_165)] transition-all hover:border-[oklch(0.82_0.22_165/0.6)] hover:bg-[oklch(0.82_0.22_165/0.1)] disabled:opacity-50"
+            className="flex items-center gap-2 rounded-lg border border-[oklch(0.82_0.22_165/0.3)] bg-[oklch(0.10_0.02_280/0.6)] px-3.5 py-2 font-mono text-xs tracking-[0.15em] text-[oklch(0.82_0.22_165)] transition-all hover:border-[oklch(0.82_0.22_165/0.6)] hover:bg-[oklch(0.82_0.22_165/0.1)] disabled:opacity-50"
             aria-label="Refresh platform stats"
           >
             <RefreshCw
-              className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`}
+              className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`}
             />
             RESYNC
           </button>
@@ -213,21 +213,21 @@ function PlatformCard({
       />
 
       {/* header strip */}
-      <div className="relative flex items-center gap-2.5 border-b border-white/5 bg-[oklch(0.13_0.04_280/60)] px-4 py-2.5">
-        <span className={`flex h-6 w-6 items-center justify-center rounded-md ${ui.bgIcon}`}>
-          <ui.icon className={`h-3.5 w-3.5 ${ui.text}`} />
+      <div className="relative flex items-center gap-2.5 border-b border-white/5 bg-[oklch(0.13_0.04_280/60)] px-5 py-3">
+        <span className={`flex h-8 w-8 items-center justify-center rounded-md ${ui.bgIcon}`}>
+          <ui.icon className={`h-4 w-4 ${ui.text}`} />
         </span>
-        <span className="font-mono text-[10px] tracking-[0.22em] text-foreground/80">
+        <span className="font-mono text-xs font-semibold tracking-[0.18em] text-foreground/90">
           {ui.name}
         </span>
-        <span className="ml-auto font-mono text-[8px] tracking-[0.2em] text-muted-foreground/50">
+        <span className="ml-auto font-mono text-[11px] tracking-[0.15em] text-muted-foreground/60">
           {ui.channel}
         </span>
         <StatusBadge status={status} />
       </div>
 
       {/* body */}
-      <div className="relative flex flex-1 flex-col p-5">
+      <div className="relative flex flex-1 flex-col p-7">
         {loading && <CardSkeleton />}
         {!loading && data?.status === "standby" && <StandbyBody />}
         {!loading && data?.status === "degraded" && (
@@ -240,15 +240,17 @@ function PlatformCard({
       </div>
 
       {/* footer */}
-      <div className="relative flex items-center justify-between gap-3 border-t border-white/5 px-4 py-2.5">
-        <span className="flex min-w-0 items-center gap-2 font-mono text-[9px] tracking-[0.15em] text-muted-foreground">
+      <div className="relative flex items-center justify-between gap-3 border-t border-white/5 px-5 py-3">
+        <span className="flex min-w-0 items-center gap-2 font-mono text-xs tracking-[0.1em] text-muted-foreground">
           {data?.stats &&
             "avatarUrl" in data.stats &&
             data.stats.avatarUrl && (
               <img
                 src={data.stats.avatarUrl}
                 alt={`${data.label} avatar`}
-                className="h-4 w-4 shrink-0 rounded-full border border-white/20 object-cover"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                className="h-5 w-5 shrink-0 rounded-full border border-white/20 object-cover"
               />
             )}
           <span className="truncate">
@@ -260,13 +262,13 @@ function PlatformCard({
             href={data.profileUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className={`flex shrink-0 items-center gap-1 font-mono text-[9px] tracking-[0.2em] ${ui.text} transition-opacity hover:opacity-70`}
+            className={`flex shrink-0 items-center gap-1.5 font-mono text-xs tracking-[0.15em] ${ui.text} transition-opacity hover:opacity-70`}
           >
             VIEW PROFILE
-            <ExternalLink className="h-3 w-3" />
+            <ExternalLink className="h-3.5 w-3.5" />
           </a>
         ) : (
-          <span className="font-mono text-[9px] tracking-[0.2em] text-muted-foreground/40">
+          <span className="font-mono text-xs tracking-[0.15em] text-muted-foreground/40">
             OFFLINE
           </span>
         )}
@@ -279,10 +281,10 @@ function PlatformCard({
 function StatusBadge({ status }: { status: string }) {
   if (status === "live") {
     return (
-      <span className="flex items-center gap-1.5 rounded-full border border-[oklch(0.82_0.22_165/0.35)] bg-[oklch(0.82_0.22_165/0.08)] px-2 py-0.5 font-mono text-[8px] tracking-[0.22em] text-[oklch(0.82_0.22_165)]">
-        <span className="relative flex h-1.5 w-1.5">
+      <span className="flex items-center gap-1.5 rounded-full border border-[oklch(0.82_0.22_165/0.35)] bg-[oklch(0.82_0.22_165/0.08)] px-2.5 py-1 font-mono text-[11px] tracking-[0.18em] text-[oklch(0.82_0.22_165)]">
+        <span className="relative flex h-2 w-2">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[oklch(0.82_0.22_165/0.8)]" />
-          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[oklch(0.82_0.22_165)]" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-[oklch(0.82_0.22_165)]" />
         </span>
         LIVE
       </span>
@@ -290,15 +292,15 @@ function StatusBadge({ status }: { status: string }) {
   }
   if (status === "degraded") {
     return (
-      <span className="flex items-center gap-1.5 rounded-full border border-[oklch(0.72_0.25_320/0.4)] bg-[oklch(0.72_0.25_320/0.1)] px-2 py-0.5 font-mono text-[8px] tracking-[0.22em] text-[oklch(0.72_0.25_320)]">
-        <AlertTriangle className="h-2.5 w-2.5" />
+      <span className="flex items-center gap-1.5 rounded-full border border-[oklch(0.72_0.25_320/0.4)] bg-[oklch(0.72_0.25_320/0.1)] px-2.5 py-1 font-mono text-[11px] tracking-[0.18em] text-[oklch(0.72_0.25_320)]">
+        <AlertTriangle className="h-3 w-3" />
         SIGNAL LOST
       </span>
     );
   }
   return (
-    <span className="flex items-center gap-1.5 rounded-full border border-[oklch(0.75_0.22_90/0.35)] bg-[oklch(0.75_0.22_90/0.08)] px-2 py-0.5 font-mono text-[8px] tracking-[0.22em] text-[oklch(0.75_0.22_90)]">
-      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[oklch(0.75_0.22_90)]" />
+    <span className="flex items-center gap-1.5 rounded-full border border-[oklch(0.75_0.22_90/0.35)] bg-[oklch(0.75_0.22_90/0.08)] px-2.5 py-1 font-mono text-[11px] tracking-[0.18em] text-[oklch(0.75_0.22_90)]">
+      <span className="h-2 w-2 animate-pulse rounded-full bg-[oklch(0.75_0.22_90)]" />
       STANDBY
     </span>
   );
@@ -331,10 +333,10 @@ function StandbyBody() {
         <span className="absolute inset-0 animate-ping rounded-full border border-[oklch(0.75_0.22_90/0.15)]" />
         <SatelliteDish className="h-6 w-6 animate-pulse text-[oklch(0.75_0.22_90)]" />
       </div>
-      <div className="font-display text-sm font-bold tracking-[0.15em] text-[oklch(0.75_0.22_90)]">
+      <div className="font-display text-base font-bold tracking-[0.12em] text-[oklch(0.75_0.22_90)]">
         AWAITING UPLINK
       </div>
-      <p className="max-w-[220px] font-mono text-[9px] leading-relaxed tracking-[0.1em] text-muted-foreground">
+      <p className="max-w-[260px] font-mono text-xs leading-relaxed tracking-[0.05em] text-muted-foreground">
         PROFILE LINK NOT CONFIGURED — TRANSMIT YOUR HANDLE TO ACTIVATE THIS
         FEED
       </p>
@@ -345,11 +347,11 @@ function StandbyBody() {
 function DegradedBody({ error }: { error: string | null }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-2 py-6 text-center">
-      <AlertTriangle className="h-7 w-7 text-[oklch(0.72_0.25_320)]" />
-      <div className="font-display text-sm font-bold tracking-[0.15em] text-[oklch(0.72_0.25_320)]">
+      <AlertTriangle className="h-8 w-8 text-[oklch(0.72_0.25_320)]" />
+      <div className="font-display text-base font-bold tracking-[0.12em] text-[oklch(0.72_0.25_320)]">
         SIGNAL LOST
       </div>
-      <p className="font-mono text-[9px] tracking-[0.12em] text-muted-foreground">
+      <p className="font-mono text-xs tracking-[0.05em] text-muted-foreground">
         {error ?? "UPSTREAM UNAVAILABLE"} — AUTO-RETRY ACTIVE
       </p>
     </div>
@@ -375,8 +377,8 @@ function LiveBody({
 /* ================= activity heatmap (shared) ================= */
 
 const HEAT_WEEKS = 52;
-const HEAT_CELL = 4; // px
-const HEAT_GAP = 1; // px
+const HEAT_CELL = 8; // px
+const HEAT_GAP = 2; // px
 const HEAT_STEP = HEAT_CELL + HEAT_GAP;
 
 /** Per-platform intensity palettes (level 0 → 4). */
@@ -467,14 +469,14 @@ function MiniHeatmap({
 
   return (
     <div>
-      <div className="w-fit">
+      <div className="w-fit max-w-full overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {/* month labels */}
-        <div className="relative mb-1 h-[8px]" aria-hidden>
+        <div className="relative mb-1.5 h-[12px]" aria-hidden>
           {weeks.map((wk, wi) =>
             wk.monthLabel ? (
               <span
                 key={wk.cells[0].date || wi}
-                className="absolute font-mono text-[7px] leading-none text-muted-foreground/60"
+                className="absolute font-mono text-[11px] leading-none text-muted-foreground"
                 style={{ left: `${wi * HEAT_STEP}px` }}
               >
                 {wk.monthLabel}
@@ -496,7 +498,12 @@ function MiniHeatmap({
                         ? `${c.count} ${unit} · ${c.date}`
                         : `0 ${unit} · ${c.date}`
                   }
-                  className={`h-[4px] w-[4px] rounded-[1px] ${
+                  style={
+                    c.future
+                      ? undefined
+                      : { width: `${HEAT_CELL}px`, height: `${HEAT_CELL}px` }
+                  }
+                  className={`rounded-[2px] ${
                     c.future ? "bg-transparent" : levels[heatLevel(c.count, thresholds)]
                   }`}
                 />
@@ -506,14 +513,14 @@ function MiniHeatmap({
         </div>
       </div>
       {/* legend */}
-      <div className="mt-2 flex items-center justify-between font-mono text-[7px] tracking-[0.15em] text-muted-foreground/70">
+      <div className="mt-2.5 flex items-center justify-between font-mono text-[11px] tracking-[0.1em] text-muted-foreground">
         <span>
           {activeTotal.toLocaleString()} {unit} · 52W
         </span>
-        <span className="flex items-center gap-1">
+        <span className="flex items-center gap-1.5">
           LESS
           {levels.map((cls, i) => (
-            <span key={i} className={`h-[4px] w-[4px] rounded-[1px] ${cls}`} />
+            <span key={i} style={{ width: `${HEAT_CELL}px`, height: `${HEAT_CELL}px` }} className={`rounded-[2px] ${cls}`} />
           ))}
           MORE
         </span>
@@ -558,7 +565,7 @@ function LeetCodeBody({ stats }: { stats: LeetCodeStats }) {
     <div className="flex flex-1 flex-col gap-5">
       {/* ring + big number */}
       <div className="flex items-center gap-5">
-        <div className="relative h-24 w-24 shrink-0">
+        <div className="relative h-32 w-32 shrink-0">
           <svg viewBox="0 0 80 80" className="h-full w-full -rotate-90">
             <circle
               cx="40"
@@ -584,22 +591,22 @@ function LeetCodeBody({ stats }: { stats: LeetCodeStats }) {
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="font-display text-2xl font-black leading-none text-foreground">
+            <span className="font-display text-4xl font-black leading-none text-foreground">
               {stats.totalSolved}
             </span>
-            <span className="mt-0.5 font-mono text-[7px] tracking-[0.2em] text-muted-foreground">
+            <span className="mt-1 font-mono text-[11px] tracking-[0.2em] text-muted-foreground">
               SOLVED
             </span>
           </div>
         </div>
-        <div className="flex-1 space-y-2.5">
+        <div className="flex-1 space-y-3">
           {bars.map((b) => (
             <div key={b.label}>
-              <div className="mb-1 flex items-center justify-between font-mono text-[8px] tracking-[0.18em]">
+              <div className="mb-1.5 flex items-center justify-between font-mono text-xs tracking-[0.12em]">
                 <span className={b.text}>{b.label}</span>
                 <span className="text-muted-foreground">{b.count}</span>
               </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+              <div className="h-2 overflow-hidden rounded-full bg-white/5">
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${(b.count / maxCount) * 100}%` }}
@@ -613,7 +620,7 @@ function LeetCodeBody({ stats }: { stats: LeetCodeStats }) {
       </div>
 
       {/* meta row */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-white/5 pt-3 font-mono text-[8px] tracking-[0.15em] text-muted-foreground">
+      <div className="flex flex-wrap gap-x-4 gap-y-1.5 border-t border-white/5 pt-3.5 font-mono text-xs tracking-[0.1em] text-muted-foreground">
         <span>
           GLOBAL RANK{" "}
           {ranked ? (
@@ -639,8 +646,8 @@ function LeetCodeBody({ stats }: { stats: LeetCodeStats }) {
       </div>
 
       {/* solving grid */}
-      <div className="border-t border-white/5 pt-3">
-        <div className="mb-1.5 flex items-center justify-between font-mono text-[8px] tracking-[0.2em] text-muted-foreground">
+      <div className="border-t border-white/5 pt-3.5">
+        <div className="mb-2 flex items-center justify-between font-mono text-xs tracking-[0.12em] text-muted-foreground">
           <span>SOLVING GRID · 52W</span>
           <span>
             STREAK <span className="text-[oklch(0.75_0.22_90)]">{stats.streak ?? 0}d</span>
@@ -658,15 +665,15 @@ function LeetCodeBody({ stats }: { stats: LeetCodeStats }) {
 
       {/* skill signals */}
       {stats.skillTags.length > 0 && (
-        <div className="border-t border-white/5 pt-3">
-          <div className="mb-1.5 font-mono text-[8px] tracking-[0.2em] text-muted-foreground">
+        <div className="border-t border-white/5 pt-3.5">
+          <div className="mb-2 font-mono text-xs tracking-[0.12em] text-muted-foreground">
             SKILL SIGNALS
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {stats.skillTags.map((tag) => (
               <span
                 key={tag}
-                className="rounded-full border border-[oklch(0.82_0.22_165/0.3)] bg-[oklch(0.82_0.22_165/0.08)] px-2.5 py-0.5 font-mono text-[8px] tracking-[0.1em] text-[oklch(0.82_0.22_165)]"
+                className="rounded-full border border-[oklch(0.82_0.22_165/0.3)] bg-[oklch(0.82_0.22_165/0.08)] px-3 py-1 font-mono text-xs tracking-[0.05em] text-[oklch(0.82_0.22_165)]"
               >
                 {tag}
               </span>
@@ -677,30 +684,30 @@ function LeetCodeBody({ stats }: { stats: LeetCodeStats }) {
 
       {/* recent solves feed */}
       {stats.recentSolves.length > 0 && (
-        <div className="border-t border-white/5 pt-3">
-          <div className="mb-1.5 flex items-center gap-1.5 font-mono text-[8px] tracking-[0.2em] text-muted-foreground">
-            <span className="h-1 w-1 animate-pulse rounded-full bg-[oklch(0.82_0.22_165)]" />
+        <div className="border-t border-white/5 pt-3.5">
+          <div className="mb-2 flex items-center gap-1.5 font-mono text-xs tracking-[0.12em] text-muted-foreground">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[oklch(0.82_0.22_165)]" />
             RECENT SOLVES
           </div>
-          <ul className="space-y-1">
+          <ul className="space-y-1.5">
             {stats.recentSolves.map((solve) => (
               <li key={solve.titleSlug}>
                 <a
                   href={`https://leetcode.com/problems/${solve.titleSlug}/`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group flex items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-white/[0.03]"
+                  className="group flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-white/[0.03]"
                 >
                   <span
                     aria-hidden
-                    className="font-mono text-[8px] text-[oklch(0.82_0.22_165)]"
+                    className="font-mono text-[11px] text-[oklch(0.82_0.22_165)]"
                   >
                     ▸
                   </span>
-                  <span className="min-w-0 flex-1 truncate font-mono text-[9px] tracking-[0.08em] text-foreground/75 transition-colors group-hover:text-foreground">
+                  <span className="min-w-0 flex-1 truncate font-mono text-xs tracking-[0.03em] text-foreground/80 transition-colors group-hover:text-foreground">
                     {solve.title}
                   </span>
-                  <span className="shrink-0 font-mono text-[8px] text-muted-foreground/60">
+                  <span className="shrink-0 font-mono text-xs text-muted-foreground/70">
                     {relTime(solve.timestamp)}
                   </span>
                 </a>
@@ -719,7 +726,7 @@ function LeetCodeBody({ stats }: { stats: LeetCodeStats }) {
 function RatingTrajectory({ history }: { history: CodeforcesHistoryPoint[] }) {
   if (history.length === 0) {
     return (
-      <div className="flex h-[64px] items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.02] font-mono text-[8px] tracking-[0.18em] text-muted-foreground/60">
+      <div className="flex h-[80px] items-center justify-center rounded-lg border border-dashed border-white/10 bg-white/[0.02] px-4 text-center font-mono text-xs tracking-[0.1em] text-muted-foreground/70">
         NO CONTESTS LOGGED — TRAJECTORY ARMED
       </div>
     );
@@ -827,7 +834,7 @@ function RatingTrajectory({ history }: { history: CodeforcesHistoryPoint[] }) {
         x={r2(peakTextX)}
         y={TOP}
         textAnchor={peakLeft ? "start" : "end"}
-        fontSize="7"
+        fontSize="10"
         fontFamily="ui-monospace, monospace"
         fill="oklch(0.72 0.25 320)"
       >
@@ -846,22 +853,22 @@ function CodeforcesBody({ stats }: { stats: CodeforcesStats }) {
     : null;
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-1 py-1 text-center">
-      <div className="font-mono text-[8px] tracking-[0.25em] text-muted-foreground">
+    <div className="flex flex-1 flex-col items-center justify-center gap-1.5 py-1 text-center">
+      <div className="font-mono text-xs tracking-[0.2em] text-muted-foreground">
         CURRENT RATING
       </div>
       <div className={`font-display text-5xl font-black leading-none ${tier.text}`}>
         {stats.rating ?? "—"}
       </div>
       <div
-        className={`mt-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-0.5 font-mono text-[8px] tracking-[0.2em] ${tier.text}`}
+        className={`mt-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-1 font-mono text-xs tracking-[0.15em] ${tier.text}`}
       >
         {tier.label}
       </div>
 
       {/* rating trajectory */}
-      <div className="mt-4 w-full">
-        <div className="mb-1.5 flex items-center justify-between font-mono text-[8px] tracking-[0.2em] text-muted-foreground">
+      <div className="mt-5 w-full">
+        <div className="mb-2 flex items-center justify-between font-mono text-xs tracking-[0.12em] text-muted-foreground">
           <span>RATING TRAJECTORY</span>
           <span>
             {stats.contestsCount ?? stats.ratingHistory.length} CONTESTS
@@ -871,7 +878,13 @@ function CodeforcesBody({ stats }: { stats: CodeforcesStats }) {
       </div>
 
       {/* meta row */}
-      <div className="flex w-full flex-wrap justify-center gap-x-4 gap-y-1 border-t border-white/5 pt-3 font-mono text-[8px] tracking-[0.15em] text-muted-foreground">
+      <div className="flex w-full flex-wrap justify-center gap-x-4 gap-y-1.5 border-t border-white/5 pt-3.5 font-mono text-xs tracking-[0.1em] text-muted-foreground">
+        <span>
+          SOLVED{" "}
+          <span className="text-[oklch(0.82_0.22_165)]">
+            {stats.problemsSolved ?? "—"}
+          </span>
+        </span>
         <span>
           PEAK <span className="text-[oklch(0.72_0.25_320)]">{stats.maxRating ?? "—"}</span>
         </span>
@@ -905,20 +918,20 @@ function GitHubBody({ stats }: { stats: GitHubStats }) {
     : null;
 
   return (
-    <div className="flex flex-1 flex-col gap-4">
-      <div className="grid grid-cols-2 gap-2.5">
+    <div className="flex flex-1 flex-col gap-5">
+      <div className="grid grid-cols-2 gap-3">
         {cells.map((c, i) => (
           <motion.div
             key={c.label}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 + i * 0.08 }}
-            className="rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2.5"
+            className="rounded-lg border border-white/5 bg-white/[0.02] p-4"
           >
-            <div className="font-display text-xl font-bold text-[oklch(0.78_0.20_195)]">
+            <div className="font-display text-3xl font-bold text-[oklch(0.78_0.20_195)]">
               {c.value}
             </div>
-            <div className="mt-0.5 font-mono text-[8px] tracking-[0.18em] text-muted-foreground">
+            <div className="mt-1 font-mono text-xs tracking-[0.12em] text-muted-foreground">
               {c.label}
             </div>
           </motion.div>
@@ -927,8 +940,8 @@ function GitHubBody({ stats }: { stats: GitHubStats }) {
 
       {/* contribution grid */}
       {stats.contributions != null && (
-        <div className="border-t border-white/5 pt-3">
-          <div className="mb-1.5 flex items-center justify-between font-mono text-[8px] tracking-[0.2em] text-muted-foreground">
+        <div className="border-t border-white/5 pt-3.5">
+          <div className="mb-2 flex items-center justify-between font-mono text-xs tracking-[0.12em] text-muted-foreground">
             <span>CONTRIBUTION GRID · 1Y</span>
             <span>
               <span className="text-[oklch(0.78_0.20_195)]">
@@ -948,14 +961,14 @@ function GitHubBody({ stats }: { stats: GitHubStats }) {
 
       {stats.topLanguages.length > 0 && (
         <div>
-          <div className="mb-1.5 font-mono text-[8px] tracking-[0.2em] text-muted-foreground">
+          <div className="mb-2 font-mono text-xs tracking-[0.12em] text-muted-foreground">
             TOP LANGUAGES
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {stats.topLanguages.map((lang) => (
               <span
                 key={lang}
-                className="rounded-full border border-[oklch(0.78_0.20_195/0.3)] bg-[oklch(0.78_0.20_195/0.08)] px-2.5 py-0.5 font-mono text-[8px] tracking-[0.1em] text-[oklch(0.78_0.20_195)]"
+                className="rounded-full border border-[oklch(0.78_0.20_195/0.3)] bg-[oklch(0.78_0.20_195/0.08)] px-3 py-1 font-mono text-xs tracking-[0.05em] text-[oklch(0.78_0.20_195)]"
               >
                 {lang}
               </span>
@@ -965,7 +978,7 @@ function GitHubBody({ stats }: { stats: GitHubStats }) {
       )}
 
       {since && (
-        <div className="mt-auto border-t border-white/5 pt-3 font-mono text-[8px] tracking-[0.15em] text-muted-foreground">
+        <div className="mt-auto border-t border-white/5 pt-3.5 font-mono text-xs tracking-[0.1em] text-muted-foreground">
           TRANSMITTING SINCE <span className="text-[oklch(0.78_0.20_195)]">{since}</span>
         </div>
       )}

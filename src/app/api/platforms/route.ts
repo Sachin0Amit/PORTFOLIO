@@ -1,4 +1,12 @@
 import { NextResponse } from "next/server";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { requireAdminKey } from "@/lib/admin-auth";
+import {
+  bodyErrorResponse,
+  rateLimitedResponse,
+  readJsonBody,
+} from "@/lib/api-utils";
+import { PlatformUpdateSchema, firstIssue } from "@/lib/api-schemas";
 import { db } from "@/lib/db";
 import {
   PLATFORM_FETCHERS,
@@ -11,8 +19,6 @@ import {
   type PlatformId,
   type PlatformResponse,
 } from "@/lib/platform-types";
-
-const HANDLE_RE = /^[A-Za-z0-9_-]{1,39}$/;
 
 /**
  * GET /api/platforms — live stats for every coding-platform uplink.
@@ -68,7 +74,14 @@ export async function GET() {
         };
       }
 
-      const res = await PLATFORM_FETCHERS[platform](handle);
+      // One platform's failure must never take down the other cards.
+      let res: Awaited<ReturnType<(typeof PLATFORM_FETCHERS)[typeof platform]>>;
+      try {
+        res = await PLATFORM_FETCHERS[platform](handle);
+      } catch (err) {
+        console.error(`[UPLINK] ${platform} fetcher threw:`, err);
+        res = { ok: false, error: "UPSTREAM UNREACHABLE" };
+      }
       if (res.ok) {
         return {
           platform,
@@ -101,77 +114,42 @@ export async function GET() {
   return NextResponse.json({ ok: true, platforms: results });
 }
 
-interface PostBody {
-  platform?: string;
-  handle?: string | null;
-  profileUrl?: string | null;
-  enabled?: boolean;
-}
-
 /**
  * POST /api/platforms — connect (or update) a platform uplink.
  * Body: { platform: "leetcode" | "codeforces" | "github",
  *         handle: "username", profileUrl?: "https://..." }
  *
- * Optional guard: if UPLINK_ADMIN_KEY is set in the environment, requests
- * must send header `x-uplink-key: <same value>`. When unset (dev), open.
+ * Admin key required (see requireAdminKey — fail-closed in production).
  */
 export async function POST(req: Request) {
   try {
-    const adminKey = process.env.UPLINK_ADMIN_KEY;
-    if (adminKey && req.headers.get("x-uplink-key") !== adminKey) {
-      return NextResponse.json(
-        { ok: false, error: "Invalid uplink key" },
-        { status: 401 }
-      );
+    const denied = requireAdminKey(req);
+    if (denied) return denied;
+    if (!checkRateLimit(req, "platforms", { limit: 20, windowMs: 60_000 })) {
+      return rateLimitedResponse();
     }
 
-    const body = (await req.json()) as PostBody;
-    const platform = body.platform as PlatformId | undefined;
-
-    if (!platform || !PLATFORM_IDS.includes(platform)) {
+    const parsed = PlatformUpdateSchema.safeParse(await readJsonBody(req));
+    if (!parsed.success) {
       return NextResponse.json(
-        {
-          ok: false,
-          error: `platform must be one of: ${PLATFORM_IDS.join(", ")}`,
-        },
+        { ok: false, error: firstIssue(parsed) },
         { status: 400 }
       );
     }
-
-    const handle = body.handle?.trim() ?? null;
-    if (handle !== null && !HANDLE_RE.test(handle)) {
-      return NextResponse.json(
-        { ok: false, error: "Invalid handle format (max 39 chars, letters/digits/_/-)" },
-        { status: 400 }
-      );
-    }
-
-    const profileUrl = body.profileUrl?.trim() ?? null;
-    if (profileUrl !== null) {
-      try {
-        const u = new URL(profileUrl);
-        if (u.protocol !== "http:" && u.protocol !== "https:") throw new Error();
-      } catch {
-        return NextResponse.json(
-          { ok: false, error: "profileUrl must be a valid http(s) URL" },
-          { status: 400 }
-        );
-      }
-    }
+    const { platform, handle, profileUrl, enabled } = parsed.data;
 
     const record = await db.platformConfig.upsert({
       where: { platform },
       update: {
         handle,
         profileUrl,
-        ...(typeof body.enabled === "boolean" ? { enabled: body.enabled } : {}),
+        ...(typeof enabled === "boolean" ? { enabled } : {}),
       },
       create: {
         platform,
         handle,
         profileUrl,
-        enabled: body.enabled ?? true,
+        enabled: enabled ?? true,
         sortOrder: PLATFORM_IDS.indexOf(platform),
       },
     });
@@ -188,6 +166,8 @@ export async function POST(req: Request) {
       enabled: record.enabled,
     });
   } catch (err) {
+    const bodyErr = bodyErrorResponse(err);
+    if (bodyErr) return bodyErr;
     console.error("[UPLINK] POST failed:", err);
     return NextResponse.json(
       { ok: false, error: "Failed to save uplink config" },
@@ -202,12 +182,10 @@ export async function POST(req: Request) {
  */
 export async function DELETE(req: Request) {
   try {
-    const adminKey = process.env.UPLINK_ADMIN_KEY;
-    if (adminKey && req.headers.get("x-uplink-key") !== adminKey) {
-      return NextResponse.json(
-        { ok: false, error: "Invalid uplink key" },
-        { status: 401 }
-      );
+    const denied = requireAdminKey(req);
+    if (denied) return denied;
+    if (!checkRateLimit(req, "platforms", { limit: 20, windowMs: 60_000 })) {
+      return rateLimitedResponse();
     }
 
     const platform = new URL(req.url).searchParams.get("platform") as

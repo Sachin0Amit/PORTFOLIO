@@ -29,10 +29,18 @@ export function AlienCursor() {
     let raf = 0;
     const trail: TrailDot[] = [];
     const MAX_TRAIL = 14;
+    // Guards so mousemove only triggers a render when values actually change
+    // (React bails out on identical state, but skipping the call avoids the
+    // scheduling work entirely on every pointer event).
+    let enabledFired = false;
+    let hoveringState = false;
 
     const onMove = (e: MouseEvent) => {
       // Enable on first real mouse movement (event handler — safe to setState).
-      setEnabled(true);
+      if (!enabledFired) {
+        enabledFired = true;
+        setEnabled(true);
+      }
       pos.x = e.clientX;
       pos.y = e.clientY;
       trail.unshift({ x: e.clientX, y: e.clientY, life: 1 });
@@ -42,7 +50,11 @@ export function AlienCursor() {
       const interactive = target.closest(
         "a, button, [role='button'], input, textarea, select, [data-cursor='hover']"
       );
-      setHovering(!!interactive);
+      const nextHovering = !!interactive;
+      if (nextHovering !== hoveringState) {
+        hoveringState = nextHovering;
+        setHovering(nextHovering);
+      }
     };
 
     const render = () => {

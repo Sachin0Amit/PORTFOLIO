@@ -1,11 +1,24 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { requireAdminKey } from "@/lib/admin-auth";
+import {
+  bodyErrorResponse,
+  rateLimitedResponse,
+  readJsonBody,
+} from "@/lib/api-utils";
+import {
+  ContactPatchSchema,
+  ContactSchema,
+  firstIssue,
+} from "@/lib/api-schemas";
 
 interface ContactPayload {
-  name?: string;
-  email?: string;
-  frequency?: string;
-  message?: string;
+  name: string;
+  email: string;
+  frequency: string;
+  message: string;
+  receivedAt: string;
 }
 
 /**
@@ -13,16 +26,16 @@ interface ContactPayload {
  * them to SQLite via Prisma. Falls back to an in-memory buffer if the
  * database is unavailable so the form never hard-fails.
  */
-const fallbackBuffer: Array<ContactPayload & { receivedAt: string }> = [];
+const fallbackBuffer: ContactPayload[] = [];
 
-async function saveTransmission(payload: ContactPayload & { receivedAt: string }) {
+async function saveTransmission(payload: ContactPayload) {
   try {
     const record = await db.transmission.create({
       data: {
-        name: payload.name!,
-        email: payload.email!,
-        frequency: payload.frequency ?? "EARTH",
-        message: payload.message!,
+        name: payload.name,
+        email: payload.email,
+        frequency: payload.frequency,
+        message: payload.message,
       },
     });
     return { persisted: true as const, id: record.id };
@@ -37,34 +50,28 @@ async function saveTransmission(payload: ContactPayload & { receivedAt: string }
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as ContactPayload;
-
-    if (!body.name || !body.email || !body.message) {
-      return NextResponse.json(
-        { ok: false, error: "Missing required fields: name, email, message" },
-        { status: 400 }
-      );
+    if (!checkRateLimit(req, "contact", { limit: 5, windowMs: 60_000 })) {
+      return rateLimitedResponse("Too many transmissions — retry in a minute");
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(body.email)) {
+    const parsed = ContactSchema.safeParse(await readJsonBody(req));
+    if (!parsed.success) {
       return NextResponse.json(
-        { ok: false, error: "Invalid return frequency (email)" },
-        { status: 400 }
-      );
-    }
-
-    if (body.message.length > 5000) {
-      return NextResponse.json(
-        { ok: false, error: "Message payload exceeds 5000 characters" },
+        { ok: false, error: firstIssue(parsed) },
         { status: 400 }
       );
     }
 
     const receivedAt = new Date().toISOString();
-    const result = await saveTransmission({ ...body, receivedAt });
+    const result = await saveTransmission({
+      name: parsed.data.name,
+      email: parsed.data.email,
+      frequency: parsed.data.frequency || "EARTH",
+      message: parsed.data.message,
+      receivedAt,
+    });
 
-    console.log("[SIGNAL] New transmission from:", body.email, "→ persisted:", result.persisted);
+    console.log("[SIGNAL] New transmission from:", parsed.data.email, "→ persisted:", result.persisted);
 
     return NextResponse.json({
       ok: true,
@@ -72,7 +79,9 @@ export async function POST(req: Request) {
       persisted: result.persisted,
       message: "Signal received and decoded successfully.",
     });
-  } catch {
+  } catch (err) {
+    const bodyErr = bodyErrorResponse(err);
+    if (bodyErr) return bodyErr;
     return NextResponse.json(
       { ok: false, error: "Failed to decode transmission" },
       { status: 500 }
@@ -80,34 +89,55 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+
+  // Owner inbox (private): recent messages, newest first. Admin key required.
+  if (url.searchParams.get("inbox") === "1") {
+    const denied = requireAdminKey(req);
+    if (denied) return denied;
+    try {
+      const messages = await db.transmission.findMany({
+        orderBy: { createdAt: "desc" },
+        take: 20,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          frequency: true,
+          message: true,
+          read: true,
+          createdAt: true,
+        },
+      });
+      return NextResponse.json({
+        ok: true,
+        messages: messages.map((m) => ({
+          ...m,
+          createdAt: m.createdAt.toISOString(),
+        })),
+      });
+    } catch (err) {
+      console.error("[SIGNAL] Inbox read failed:", err);
+      return NextResponse.json(
+        { ok: false, error: "Failed to read inbox" },
+        { status: 500 }
+      );
+    }
+  }
+
+  // Public endpoint: aggregate counts only. Message contents (name/email/
+  // message) are private and never exposed here.
   try {
     const [total, unread] = await Promise.all([
       db.transmission.count(),
       db.transmission.count({ where: { read: false } }),
     ]);
-    const latest = await db.transmission.findFirst({
-      orderBy: { createdAt: "desc" },
-      select: {
-        name: true,
-        email: true,
-        message: true,
-        createdAt: true,
-      },
-    });
     return NextResponse.json({
       ok: true,
       total,
       unread,
       buffered: fallbackBuffer.length,
-      latest: latest
-        ? {
-            name: latest.name,
-            email: latest.email,
-            message: latest.message,
-            receivedAt: latest.createdAt.toISOString(),
-          }
-        : fallbackBuffer[fallbackBuffer.length - 1] ?? null,
     });
   } catch {
     // DB unavailable — return the in-memory buffer stats instead
@@ -116,8 +146,54 @@ export async function GET() {
       total: fallbackBuffer.length,
       unread: fallbackBuffer.length,
       buffered: fallbackBuffer.length,
-      latest: fallbackBuffer[fallbackBuffer.length - 1] ?? null,
       degraded: true,
     });
+  }
+}
+
+/**
+ * PATCH /api/contact — mark a transmission read/unread. Admin key required.
+ * Body: { id: string, read: boolean }
+ */
+export async function PATCH(req: Request) {
+  try {
+    const denied = requireAdminKey(req);
+    if (denied) return denied;
+    if (!checkRateLimit(req, "contact-admin", { limit: 60, windowMs: 60_000 })) {
+      return rateLimitedResponse();
+    }
+
+    const parsed = ContactPatchSchema.safeParse(await readJsonBody(req));
+    if (!parsed.success) {
+      return NextResponse.json(
+        { ok: false, error: firstIssue(parsed) },
+        { status: 400 }
+      );
+    }
+
+    await db.transmission.update({
+      where: { id: parsed.data.id },
+      data: { read: parsed.data.read },
+    });
+    return NextResponse.json({ ok: true, id: parsed.data.id, read: parsed.data.read });
+  } catch (err) {
+    const bodyErr = bodyErrorResponse(err);
+    if (bodyErr) return bodyErr;
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      (err as { code?: string }).code === "P2025"
+    ) {
+      return NextResponse.json(
+        { ok: false, error: "Transmission not found" },
+        { status: 404 }
+      );
+    }
+    console.error("[SIGNAL] PATCH failed:", err);
+    return NextResponse.json(
+      { ok: false, error: "Failed to update transmission" },
+      { status: 500 }
+    );
   }
 }

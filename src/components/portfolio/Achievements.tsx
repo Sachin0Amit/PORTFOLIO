@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Gauge,
@@ -9,9 +10,11 @@ import {
   Cpu,
   MapPin,
   Award,
+  ExternalLink,
 } from "lucide-react";
 import { PROFILE } from "@/lib/portfolio-data";
 import type { Profile } from "@/lib/portfolio-data";
+import type { PlatformResponse } from "@/lib/platform-types";
 import { TiltCard } from "@/components/effects/TiltCard";
 
 type Achievement = Profile["achievements"][number];
@@ -31,9 +34,76 @@ const accentMap = {
   plasma: { color: "oklch(0.72 0.25 320)" },
 } as const;
 
+interface LiveSolves {
+  leetcode: number | null;
+  codeforces: number | null;
+}
+
+/**
+ * Live solved counts from the uplink API (same feed as the UPLINK
+ * section). Refreshes every 10 minutes so the badge stays up to date.
+ * Returns nulls until at least one platform reports live stats.
+ */
+function useLiveSolves(enabled: boolean): LiveSolves {
+  const [solves, setSolves] = useState<LiveSolves>({
+    leetcode: null,
+    codeforces: null,
+  });
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch("/api/platforms", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = (await res.json()) as { platforms?: PlatformResponse[] };
+        if (cancelled || !Array.isArray(json.platforms)) return;
+        let leetcode: number | null = null;
+        let codeforces: number | null = null;
+        for (const p of json.platforms) {
+          if (p.status !== "live" || !p.stats) continue;
+          if (p.platform === "leetcode" && "totalSolved" in p.stats) {
+            leetcode = p.stats.totalSolved;
+          }
+          if (p.platform === "codeforces" && "problemsSolved" in p.stats) {
+            codeforces = p.stats.problemsSolved;
+          }
+        }
+        // Only go live when at least one platform actually reported.
+        if (leetcode != null || codeforces != null) {
+          setSolves({ leetcode, codeforces });
+        }
+      } catch {
+        // silent — badge keeps its static value
+      }
+    };
+    load();
+    const id = setInterval(load, 10 * 60 * 1000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [enabled]);
+
+  return solves;
+}
+
 function AchievementBadge({ item, index }: { item: Achievement; index: number }) {
   const Icon = ICON_MAP[item.icon] ?? Award;
   const ac = accentMap[item.accent];
+  const hasProfileLinks = "links" in item && item.links;
+  // Live solved total for the Problem Solver badge (LC + CF).
+  const solves = useLiveSolves(!!hasProfileLinks);
+  const isLive = solves.leetcode != null || solves.codeforces != null;
+  const value =
+    hasProfileLinks && isLive
+      ? String((solves.leetcode ?? 0) + (solves.codeforces ?? 0))
+      : item.value;
+  const detail =
+    hasProfileLinks && isLive
+      ? `LC ${solves.leetcode ?? "–"} · CF ${solves.codeforces ?? "–"} · LIVE`
+      : item.detail;
   return (
     <motion.div
       initial={{ opacity: 0, y: 20, rotateX: 30 }}
@@ -69,7 +139,7 @@ function AchievementBadge({ item, index }: { item: Achievement; index: number })
             className="mt-3 font-display text-xl font-black"
             style={{ color: ac.color }}
           >
-            {item.value}
+            {value}
           </div>
           {/* Title */}
           <div className="mt-0.5 font-display text-[11px] font-bold tracking-wide text-foreground">
@@ -77,8 +147,31 @@ function AchievementBadge({ item, index }: { item: Achievement; index: number })
           </div>
           {/* Detail */}
           <div className="mt-1 font-mono text-[8px] leading-tight tracking-[0.1em] text-muted-foreground">
-            {item.detail}
+            {detail}
           </div>
+          {/* Problem-solving profiles (Problem Solver badge) */}
+          {"links" in item && item.links && (
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
+              {item.links.map((l) => (
+                <a
+                  key={l.label}
+                  href={l.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`${item.title} on ${l.label}`}
+                  className="flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[8px] tracking-[0.12em] transition-all hover:bg-white/[0.04]"
+                  style={{
+                    color: ac.color,
+                    borderColor: `${ac.color} / 0.35`,
+                    background: `${ac.color} / 0.08`,
+                  }}
+                >
+                  {l.label}
+                  <ExternalLink className="h-2.5 w-2.5" />
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       </TiltCard>
     </motion.div>

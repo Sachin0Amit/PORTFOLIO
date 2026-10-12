@@ -37,6 +37,24 @@ function timeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
+/**
+ * Defense-in-depth for user-supplied verification links (also sanitized
+ * server-side). Returns a safe href for http(s) URLs and plain emails,
+ * null for anything else (e.g. `javascript:`).
+ */
+function safeVerifyHref(link: string | null): string | null {
+  if (!link) return null;
+  const v = link.trim();
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return `mailto:${v}`;
+  try {
+    const u = new URL(v);
+    if (u.protocol === "http:" || u.protocol === "https:") return u.toString();
+  } catch {
+    // not an absolute URL — unsafe
+  }
+  return null;
+}
+
 export function Testimonials() {
   const [items, setItems] = useState<Testimonial[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,6 +153,7 @@ export function Testimonials() {
           <div className="grid gap-5 sm:grid-cols-2">
             {items.map((t, i) => {
               const ac = accentMap[t.accent] ?? accentMap.alien;
+              const verifyHref = safeVerifyHref(t.verifyLink);
               return (
                 <motion.div
                   key={t.id}
@@ -168,13 +187,9 @@ export function Testimonials() {
                               />
                             ))}
                           </div>
-                          {t.verifyLink && (
+                          {verifyHref && (
                             <a
-                              href={
-                                t.verifyLink.includes("@") && !t.verifyLink.startsWith("http")
-                                  ? `mailto:${t.verifyLink}`
-                                  : t.verifyLink
-                              }
+                              href={verifyHref}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center gap-1 rounded-full border border-[oklch(0.82_0.22_165/0.3)] bg-[oklch(0.10_0.02_280/0.6)] px-2 py-0.5 transition-all hover:border-[oklch(0.82_0.22_165/0.6)]"

@@ -20,19 +20,24 @@ export function TransmissionCounter() {
 
   useEffect(() => {
     let cancelled = false;
+    let pulseTimer: ReturnType<typeof setTimeout> | undefined;
+    // Track the last seen total outside of setState (no side-effects in updaters).
+    let lastTotal = 0;
     const fetchCount = async () => {
       try {
         const res = await fetch("/api/contact", { cache: "no-store" });
         if (!res.ok) return;
         const json = (await res.json()) as CounterData;
         if (cancelled) return;
-        setData((prev) => {
-          if (prev && json.total > prev.total) {
-            setPulse(true);
-            window.setTimeout(() => setPulse(false), 1500);
-          }
-          return json;
-        });
+        if (json.total > lastTotal) {
+          lastTotal = json.total;
+          setPulse(true);
+          if (pulseTimer) clearTimeout(pulseTimer);
+          pulseTimer = setTimeout(() => {
+            if (!cancelled) setPulse(false);
+          }, 1500);
+        }
+        setData(json);
       } catch {
         // silent fail — counter is decorative
       }
@@ -42,6 +47,7 @@ export function TransmissionCounter() {
     return () => {
       cancelled = true;
       clearInterval(id);
+      if (pulseTimer) clearTimeout(pulseTimer);
     };
   }, []);
 

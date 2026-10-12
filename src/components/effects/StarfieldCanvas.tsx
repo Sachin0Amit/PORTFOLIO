@@ -84,6 +84,31 @@ export function StarfieldCanvas({ density = 1 }: { density?: number }) {
     resize();
     window.addEventListener("resize", resize);
 
+    // Single static frame (no animation loop, no pointer tracking).
+    const drawStaticFrame = () => {
+      ctx.clearRect(0, 0, width, height);
+      for (const s of starsRef.current) {
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+        ctx.fillStyle = s.color + s.baseAlpha.toFixed(3) + ")";
+        ctx.fill();
+      }
+    };
+
+    // Respect users who prefer reduced motion: static stars, no rAF loop.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      drawStaticFrame();
+      const onStaticResize = () => {
+        resize();
+        drawStaticFrame();
+      };
+      window.removeEventListener("resize", resize);
+      window.addEventListener("resize", onStaticResize);
+      return () => {
+        window.removeEventListener("resize", onStaticResize);
+      };
+    }
+
     const onMouse = (e: MouseEvent) => {
       mouseRef.current.tx = (e.clientX / width - 0.5) * 2;
       mouseRef.current.ty = (e.clientY / height - 0.5) * 2;
@@ -230,9 +255,22 @@ export function StarfieldCanvas({ density = 1 }: { density?: number }) {
 
     animationRef.current = requestAnimationFrame(render);
 
+    // Pause the loop while the tab is hidden to save CPU/battery.
+    const onVisibility = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(animationRef.current);
+      } else {
+        cancelAnimationFrame(animationRef.current);
+        last = performance.now();
+        animationRef.current = requestAnimationFrame(render);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
     return () => {
       window.removeEventListener("resize", resize);
       window.removeEventListener("mousemove", onMouse);
+      document.removeEventListener("visibilitychange", onVisibility);
       cancelAnimationFrame(animationRef.current);
     };
   }, [density]);
