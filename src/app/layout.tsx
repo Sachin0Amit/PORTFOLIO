@@ -41,7 +41,7 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "Sachin Kumar" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/logo.svg",
   },
   openGraph: {
     title: "Sachin Kumar // Cosmic Engineer",
